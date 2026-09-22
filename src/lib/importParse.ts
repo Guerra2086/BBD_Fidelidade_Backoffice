@@ -32,39 +32,53 @@ const RAW_KEYS = [
   'ESTADO',
 ] as const;
 
-type RawRecord = Partial<Record<(typeof RAW_KEYS)[number], string>>;
+type RawRecord = Partial<Record<(typeof RAW_KEYS)[number], unknown>>;
 
-function toNumberOrNull(v: string | undefined): number | null {
-  if (v === undefined) return null;
-  const s = v.trim().replace(',', '.');
-  if (s === '') return null;
-  const n = Number(s);
+/** Converte um valor de origem desconhecida (string, número, null, …) para texto aparado. */
+function toStr(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return undefined;
+}
+
+/** Normaliza um campo que pode vir como lista ('a/b'), array (JSON) ou vazio. */
+function toList(v: unknown, separator: string): string[] {
+  if (Array.isArray(v)) return v.map((x) => toStr(x) ?? '').filter(Boolean);
+  const s = toStr(v);
+  if (!s) return [];
+  return s
+    .split(separator)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function toNumberOrNull(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = toStr(v);
+  if (!s) return null;
+  const n = Number(s.replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 }
 
 function normalizeRow(r: RawRecord): ImportRow | null {
-  const external_id = r.ID_PRODUTO?.trim();
+  const external_id = toStr(r.ID_PRODUTO);
   if (!external_id) return null;
+  const estadoOrigem = toStr(r.ESTADO) || null;
   return {
     external_id,
-    codigo_slide: r.CODIGO_SLIDE?.trim() || null,
-    nome: r.DESIGNACAO?.trim() || external_id,
-    categoria: r.CATEGORIA?.trim() || null,
-    medidas: r.MEDIDAS?.trim() || null,
-    formato: r.FORMATO?.trim() || null,
-    grade: r.GRADE?.trim() || null,
-    edificios: r.EDIFICIOS?.trim() || null,
+    codigo_slide: toStr(r.CODIGO_SLIDE) || null,
+    nome: toStr(r.DESIGNACAO) || external_id,
+    categoria: toStr(r.CATEGORIA) || null,
+    medidas: toStr(r.MEDIDAS) || null,
+    formato: toStr(r.FORMATO) || null,
+    grade: toStr(r.GRADE) || null,
+    edificios: toStr(r.EDIFICIOS) || null,
     stock: Math.max(0, Math.round(toNumberOrNull(r.QTD_TOTAL) ?? 0)),
     preco: toNumberOrNull(r.VALOR_SUGERIDO),
-    destinos: (r.DESTINOS ?? '')
-      .split('/')
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean),
-    fotos: (r.FOTOS ?? '')
-      .split(';')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    estadoOrigem: r.ESTADO?.trim() || null,
+    destinos: toList(r.DESTINOS, '/').map((s) => s.toUpperCase()),
+    fotos: toList(r.FOTOS, ';'),
+    estadoOrigem,
   };
 }
 
