@@ -25,7 +25,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     { href: '/', nome: 'Dashboard', icon: 'dash', grp: 'Geral' },
     { href: '/encomendas', nome: 'Encomendas', icon: 'cart', grp: 'Geral', count: pendentes },
     { href: '/produtos', nome: 'Produtos', icon: 'box', grp: 'Catálogo' },
-    { href: '/produtos/importar', nome: 'Importar produtos', icon: 'upload', grp: 'Catálogo' },
     { href: '/movimentos', nome: 'Movimentos de stock', icon: 'stock', grp: 'Catálogo' },
     { href: '/categorias', nome: 'Categorias e limites', icon: 'tag', grp: 'Catálogo' },
     { href: '/relatorios', nome: 'Relatórios', icon: 'chart', grp: 'Análise' },

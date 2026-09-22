@@ -1,18 +1,20 @@
-import { useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ChangeEvent as ReactChangeEvent } from 'react';
+import { useMemo, useState, type DragEvent as ReactDragEvent, type ChangeEvent as ReactChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../lib/icons';
+import { Modal } from './Modal';
+import { Pagination, paginate } from './Pagination';
 import { useToast } from '../context/ToastContext';
 import { downloadCsv } from '../lib/csv';
 import { slugify } from '../lib/text';
 import { getOrCreateCategory } from '../lib/categories';
 import { readDroppedItems, readFileList, type DroppedFolder } from '../lib/folderDrop';
 import { parseProdutosCsv, parseProdutosJson, estadoFromGrade, reviewStatusFor, type ImportRow } from '../lib/importParse';
-import { runImagePipeline, type ProcessOutcome } from '../lib/imageQueue';
+import { processOneInWorker, terminateImageWorker } from '../lib/imageQueue';
 import { uploadProcessedImage, deleteProductImageFiles, safeSourceName } from '../lib/storageUpload';
-import { pLimit } from '../lib/concurrency';
-import { processImage } from '../lib/imagePipeline';
-import type { Category, Product, ProductImage, QualityFlags } from '../types';
+import type { Category, Product, QualityFlags } from '../types';
+
+const PREVIEW_PAGE_SIZE = 10;
 
 type ProductPreview = {
   row: ImportRow;
@@ -51,9 +53,9 @@ const QUALITY_LABELS: Record<keyof QualityFlags, string> = {
   needs_reprocessing: 'por reprocessar',
 };
 
-function qualityWarnings(flags: QualityFlags | null | undefined): string[] {
-  if (!flags) return [];
-  return (Object.keys(QUALITY_LABELS) as (keyof QualityFlags)[]).filter((k) => flags[k]).map((k) => QUALITY_LABELS[k]);
+function hasQualityWarning(flags: QualityFlags | null | undefined) {
+  if (!flags) return false;
+  return (Object.keys(QUALITY_LABELS) as (keyof QualityFlags)[]).some((k) => flags[k]);
 }
 
 function buildPreview(rows: ImportRow[], folder: DroppedFolder, categories: Category[], products: Product[]): Preview {
@@ -100,7 +102,7 @@ function buildPreview(rows: ImportRow[], folder: DroppedFolder, categories: Cate
   };
 }
 
-export function Importar() {
+export function ImportModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [dragOver, setDragOver] = useState(false);
@@ -108,13 +110,9 @@ export function Importar() {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [phase, setPhase] = useState<'idle' | 'preview' | 'importing' | 'done'>('idle');
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [progressNota, setProgressNota] = useState('');
   const [report, setReport] = useState<ImportReport | null>(null);
-  const [reprocessing, setReprocessing] = useState<{ done: number; total: number } | null>(null);
-
-  const [testFiles, setTestFiles] = useState<File[]>([]);
-  const [testResults, setTestResults] = useState<{ name: string; result: Awaited<ReturnType<typeof processImage>> }[]>([]);
-  const [testing, setTesting] = useState(false);
-  const testInputRef = useRef<HTMLInputElement>(null);
+  const [previewPage, setPreviewPage] = useState(1);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -135,6 +133,7 @@ export function Importar() {
   });
 
   const preview = useMemo(() => (folder && rows.length ? buildPreview(rows, folder, categories, products) : null), [folder, rows, categories, products]);
+  const previewPaged = preview ? paginate(preview.produtos, previewPage, PREVIEW_PAGE_SIZE) : null;
 
   async function loadFolder(next: DroppedFolder) {
     if (!next.dataFile) {
@@ -151,6 +150,7 @@ export function Importar() {
       setFolder(next);
       setRows(parsed);
       setReport(null);
+      setPreviewPage(1);
       setPhase('preview');
     } catch (e) {
       toast(`Erro a ler ${next.dataFile.name}: ${e instanceof Error ? e.message : String(e)}`, 'err');
@@ -187,12 +187,12 @@ export function Importar() {
     const categoriasAntes = new Set(categories.map((c) => c.slug));
     const existingByExternalId = new Map(products.filter((p) => p.external_id).map((p) => [p.external_id as string, p]));
 
-    type PhotoTask = { id: string; file: File; productId: string; sourceFilename: string; posicao: number; capa: boolean };
-    const photoTasks: PhotoTask[] = [];
-    const totalFotosPrevistas = preview.produtos.reduce((s, p) => s + p.fotosFound.length, 0);
-    setProgress({ done: 0, total: totalFotosPrevistas });
+    const totalFotos = preview.produtos.reduce((s, p) => s + p.fotosFound.length, 0);
+    let done = 0;
+    setProgress({ done: 0, total: totalFotos });
 
     for (const p of preview.produtos) {
+      setProgressNota(p.row.nome);
       try {
         const categoria = await getOrCreateCategory(supabase, p.row.categoria, categoryCache, { createdByImport: true });
         if (!categoriasAntes.has(categoria.slug)) {
@@ -244,7 +244,7 @@ export function Importar() {
           report.produtosCriados++;
         }
 
-        // Retoma: se as fotos já foram todas enviadas numa importação anterior, salta.
+        // Retoma: se as fotos já foram todas enviadas numa importação anterior, salta o produto.
         const { data: existingImages } = await supabase.from('product_images').select('id, original_path').eq('product_id', productId);
         const existingNames = new Set(
           (existingImages ?? []).map((i) => {
@@ -257,78 +257,54 @@ export function Importar() {
 
         if (alreadyDone) {
           report.produtosSaltados++;
+          done += p.fotosFound.length;
+          setProgress({ done, total: totalFotos });
           continue;
         }
 
         if ((existingImages?.length ?? 0) > 0) {
-          const oldPaths = (existingImages ?? []).flatMap((i) => [i.original_path]);
           const { data: fullRows } = await supabase.from('product_images').select('*').eq('product_id', productId);
           await deleteProductImageFiles(
             supabase,
             (fullRows ?? []).flatMap((r) => [r.original_path, r.large_path, r.medium_path, r.thumb_path]),
           );
-          void oldPaths;
           await supabase.from('product_images').delete().eq('product_id', productId);
         }
 
-        p.fotosFound.forEach((filename, posicao) => {
+        // Coloca as fotos deste produto uma a uma, pela ordem do inventário.
+        let posicao = 0;
+        for (const filename of p.fotosFound) {
           const file = folder.images.get(filename);
-          if (file) photoTasks.push({ id: `${productId}:${filename}`, file, productId, sourceFilename: filename, posicao, capa: posicao === 0 });
-        });
+          setProgressNota(`${p.row.nome} · ${filename}`);
+          if (file) {
+            try {
+              const result = await processOneInWorker(file);
+              const paths = await uploadProcessedImage(supabase, productId, filename, result);
+              await supabase.from('product_images').insert({
+                product_id: productId,
+                posicao,
+                capa: posicao === 0,
+                ...paths,
+                quality_flags: result.quality_flags,
+                enquadramento: result.enquadramento,
+              });
+              posicao++;
+              report.fotosEnviadas++;
+              if (hasQualityWarning(result.quality_flags)) report.fotosComAvisos++;
+            } catch (e) {
+              report.erros.push(`${filename}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          done++;
+          setProgress({ done, total: totalFotos });
+        }
       } catch (e) {
         report.erros.push(`${p.row.external_id} (${p.row.nome}): ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
-    // Processa (pool de workers) e envia (concorrência de rede limitada) as fotos de todos
-    // os produtos em conjunto, para a barra de progresso refletir o total real de fotos.
-    setProgress({ done: 0, total: photoTasks.length });
-    const uploadLimit = pLimit(5);
-    let done = 0;
-    const uploads: Promise<void>[] = [];
-
-    await runImagePipeline(
-      photoTasks.map((t) => ({ id: t.id, file: t.file })),
-      {
-        concurrency: 4,
-        onItem: (outcome: ProcessOutcome) => {
-          const task = photoTasks.find((t) => t.id === outcome.id);
-          if (!task) return;
-          if (!outcome.result) {
-            report.erros.push(`${task.sourceFilename}: ${outcome.error ?? 'falha desconhecida'}`);
-            done++;
-            setProgress({ done, total: photoTasks.length });
-            return;
-          }
-          const result = outcome.result;
-          uploads.push(
-            uploadLimit(async () => {
-              try {
-                const paths = await uploadProcessedImage(supabase, task.productId, task.sourceFilename, result);
-                await supabase.from('product_images').insert({
-                  product_id: task.productId,
-                  posicao: task.posicao,
-                  capa: task.capa,
-                  ...paths,
-                  quality_flags: result.quality_flags,
-                  enquadramento: result.enquadramento,
-                });
-                report.fotosEnviadas++;
-                if (qualityWarnings(result.quality_flags).length) report.fotosComAvisos++;
-              } catch (e) {
-                report.erros.push(`${task.sourceFilename}: ${e instanceof Error ? e.message : String(e)}`);
-              } finally {
-                done++;
-                setProgress({ done, total: photoTasks.length });
-              }
-            }),
-          );
-        },
-      },
-    );
-    await Promise.all(uploads);
-
     await supabase.from('import_logs').insert({ summary: report });
+    terminateImageWorker();
     queryClient.invalidateQueries({ queryKey: ['categories'] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
     setReport(report);
@@ -336,111 +312,19 @@ export function Importar() {
     toast('Importação concluída', 'ok', `${report.produtosCriados} novos · ${report.produtosAtualizados} atualizados · ${report.fotosEnviadas} fotos`);
   }
 
-  async function reprocessAll() {
-    const { data: images, error } = await supabase.from('product_images').select('*').returns<ProductImage[]>();
-    if (error || !images) {
-      toast('Não foi possível carregar as fotos existentes', 'err');
-      return;
-    }
-    setReprocessing({ done: 0, total: images.length });
-    let done = 0;
-
-    const fetched = await Promise.all(
-      images.map(async (img) => {
-        try {
-          const res = await fetch(img.original_path);
-          const blob = await res.blob();
-          return { img, file: blob };
-        } catch {
-          return { img, file: null };
-        }
-      }),
-    );
-    const valid = fetched.filter((f): f is { img: ProductImage; file: Blob } => f.file !== null);
-    const uploadLimit = pLimit(5);
-    const uploads: Promise<void>[] = [];
-
-    await runImagePipeline(
-      valid.map((v) => ({ id: v.img.id, file: v.file })),
-      {
-        concurrency: 4,
-        onItem: (outcome) => {
-          const entry = valid.find((v) => v.img.id === outcome.id);
-          if (!entry || !outcome.result) {
-            done++;
-            setReprocessing({ done, total: images.length });
-            return;
-          }
-          const result = outcome.result;
-          uploads.push(
-            uploadLimit(async () => {
-              try {
-                const paths = await uploadProcessedImage(supabase, entry.img.product_id, entry.img.id, result);
-                await supabase
-                  .from('product_images')
-                  .update({
-                    large_path: paths.large_path,
-                    medium_path: paths.medium_path,
-                    thumb_path: paths.thumb_path,
-                    largura: paths.largura,
-                    altura: paths.altura,
-                    quality_flags: result.quality_flags,
-                    enquadramento: result.enquadramento,
-                  })
-                  .eq('id', entry.img.id);
-              } catch {
-                /* mantém a foto anterior se o reprocessamento falhar */
-              } finally {
-                done++;
-                setReprocessing({ done, total: images.length });
-              }
-            }),
-          );
-        },
-      },
-    );
-    await Promise.all(uploads);
-
-    setReprocessing(null);
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    toast('Reprocessamento de imagens concluído');
-  }
-
-  async function runTest() {
-    if (testFiles.length === 0) return;
-    setTesting(true);
-    setTestResults([]);
-    const out: { name: string; result: Awaited<ReturnType<typeof processImage>> }[] = [];
-    for (const file of testFiles.slice(0, 10)) {
-      try {
-        out.push({ name: file.name, result: await processImage(file) });
-      } catch {
-        /* ignora ficheiro que falhe no teste */
-      }
-    }
-    setTestResults(out);
-    setTesting(false);
+  function reset() {
+    setFolder(null);
+    setRows([]);
+    setReport(null);
+    setPhase('idle');
   }
 
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <h1>Importar produtos</h1>
-          <p>Arrasta a pasta FOTOS_SITE (produtos_site.json/.csv + imagens/) para criar categorias, produtos e fotos automaticamente.</p>
-        </div>
-        <div className="actions">
-          <button className="btn btn-line" onClick={reprocessAll} disabled={!!reprocessing}>
-            <Icon name="refresh" />
-            {reprocessing ? `A reprocessar… ${reprocessing.done}/${reprocessing.total}` : 'Reprocessar todas as imagens'}
-          </button>
-        </div>
-      </div>
-
+    <Modal open onClose={onClose} title="Importar produtos" sub="Arrasta a pasta FOTOS_SITE para criar categorias, produtos e fotos automaticamente" icon="upload" size="xl">
       {phase !== 'importing' && (
         <label
           className={`drop${dragOver ? ' over' : ''}`}
-          style={{ aspectRatio: 'auto', height: 160, marginBottom: 24 }}
+          style={{ aspectRatio: 'auto', height: 140, marginBottom: 20 }}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -448,7 +332,7 @@ export function Importar() {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
-          <Icon name="upload" style={{ width: 30, height: 30 }} />
+          <Icon name="upload" style={{ width: 28, height: 28 }} />
           <span>
             <b>{folder ? folder.dataFile?.name : 'Arrasta a pasta FOTOS_SITE para aqui'}</b>
             {folder ? `${folder.images.size} fotos encontradas na pasta` : 'ou clica para escolher a pasta'}
@@ -466,25 +350,18 @@ export function Importar() {
 
       {preview && phase === 'preview' && (
         <>
-          <div className="cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 20 }}>
             <PreviewStat label="Categorias novas" value={preview.categoriasNovas.length} />
-            <PreviewStat label="Categorias existentes" value={preview.categoriasExistentes.length} />
             <PreviewStat label="Produtos novos" value={preview.totais.novos} />
             <PreviewStat label="Produtos a atualizar" value={preview.totais.atualizados} />
             <PreviewStat label="Vão ficar publicados" value={preview.totais.publicados} />
             <PreviewStat label="Não publicados" value={preview.totais.naoPublicados} />
-            <PreviewStat label="Fotos encontradas" value={preview.totais.fotosEncontradas} />
             <PreviewStat label="Fotos em falta" value={preview.totais.fotosEmFalta} warn={preview.totais.fotosEmFalta > 0} />
           </div>
 
           {preview.categoriasNovas.length > 0 && (
             <p className="hint">
               Categorias novas a criar: <b>{preview.categoriasNovas.join(', ')}</b>
-            </p>
-          )}
-          {preview.fotosExtra.length > 0 && (
-            <p className="hint">
-              {preview.fotosExtra.length} fotos na pasta não estão referenciadas em nenhum produto (ignoradas).
             </p>
           )}
 
@@ -499,7 +376,7 @@ export function Importar() {
                 </tr>
               </thead>
               <tbody>
-                {preview.produtos.map((p) => (
+                {previewPaged?.pageItems.map((p) => (
                   <tr key={p.row.external_id}>
                     <td>
                       <b>{p.row.nome}</b>
@@ -534,28 +411,12 @@ export function Importar() {
               </tbody>
             </table>
           </div>
-
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button
-              className="btn btn-ghost"
-              onClick={() => {
-                setFolder(null);
-                setRows([]);
-                setPhase('idle');
-              }}
-            >
-              Cancelar
-            </button>
-            <button className="btn btn-red" onClick={runImport}>
-              <Icon name="upload" />
-              Importar tudo
-            </button>
-          </div>
+          {previewPaged && <Pagination page={previewPaged.safePage} totalPages={previewPaged.totalPages} onChange={setPreviewPage} />}
         </>
       )}
 
       {phase === 'importing' && (
-        <div className="stock-cell" style={{ marginBottom: 24 }}>
+        <div className="stock-cell" style={{ marginBottom: 8 }}>
           <div style={{ flex: 1 }}>
             <div className="lbl">
               A importar… {progress.done}/{progress.total} fotos
@@ -563,12 +424,15 @@ export function Importar() {
             <div className="sbar" style={{ width: '100%' }}>
               <i style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}></i>
             </div>
+            <div className="hint" style={{ marginTop: 6 }}>
+              {progressNota}
+            </div>
           </div>
         </div>
       )}
 
       {report && phase === 'done' && (
-        <div className="table-wrap" style={{ padding: 16 }}>
+        <div>
           <h3>Relatório da importação</h3>
           <ul>
             <li>{report.categoriasCriadas} categorias criadas</li>
@@ -589,10 +453,27 @@ export function Importar() {
               </ul>
             </details>
           )}
-          <div className="actions">
+        </div>
+      )}
+
+      <div className="actions" style={{ marginTop: 20 }}>
+        {phase === 'preview' && (
+          <>
+            <button className="btn btn-ghost" onClick={reset}>
+              Cancelar
+            </button>
+            <button className="btn btn-red" onClick={runImport}>
+              <Icon name="upload" />
+              Importar tudo
+            </button>
+          </>
+        )}
+        {phase === 'done' && (
+          <>
             <button
               className="btn btn-line"
               onClick={() =>
+                report &&
                 downloadCsv('importacao.csv', [
                   ['Categorias criadas', 'Produtos criados', 'Produtos atualizados', 'Fotos enviadas', 'Fotos com avisos', 'Erros'],
                   [report.categoriasCriadas, report.produtosCriados, report.produtosAtualizados, report.fotosEnviadas, report.fotosComAvisos, report.erros.length],
@@ -602,87 +483,21 @@ export function Importar() {
               <Icon name="down" />
               Descarregar relatório
             </button>
-            <button
-              className="btn btn-red"
-              onClick={() => {
-                setFolder(null);
-                setRows([]);
-                setReport(null);
-                setPhase('idle');
-              }}
-            >
+            <button className="btn btn-line" onClick={reset}>
               Nova importação
             </button>
-          </div>
-        </div>
-      )}
-
-      <div className="table-wrap" style={{ padding: 16, marginTop: 32 }}>
-        <h3>Testar tratamento de imagens</h3>
-        <p className="hint">Escolhe até 10 fotos para ver o resultado do tratamento automático sem gravar nada.</p>
-        <div className="actions">
-          <button className="btn btn-line" onClick={() => testInputRef.current?.click()}>
-            Escolher fotos
+            <button className="btn btn-red" onClick={onClose}>
+              Fechar
+            </button>
+          </>
+        )}
+        {phase === 'idle' && (
+          <button className="btn btn-ghost" onClick={onClose}>
+            Fechar
           </button>
-          <input
-            ref={testInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            hidden
-            onChange={(e) => setTestFiles(e.target.files ? Array.from(e.target.files).slice(0, 10) : [])}
-          />
-          <button className="btn btn-red" disabled={testFiles.length === 0 || testing} onClick={runTest}>
-            {testing ? 'A processar…' : `Testar ${testFiles.length ? `(${testFiles.length})` : ''}`}
-          </button>
-        </div>
-        {testResults.length > 0 && (
-          <div className="table-wrap" style={{ marginTop: 16 }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Ficheiro</th>
-                  <th>Original</th>
-                  <th>Medium (800×800)</th>
-                  <th>Thumb (300×300)</th>
-                  <th>Avisos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {testResults.map((t) => {
-                  const warnings = qualityWarnings(t.result.quality_flags);
-                  return (
-                    <tr key={t.name}>
-                      <td>{t.name}</td>
-                      <td>
-                        <img src={URL.createObjectURL(t.result.original)} alt="" style={{ width: 70, height: 70, objectFit: 'contain' }} />
-                      </td>
-                      <td>
-                        <img src={URL.createObjectURL(t.result.medium.blob)} alt="" style={{ width: 70, height: 70, objectFit: 'contain' }} />
-                      </td>
-                      <td>
-                        <img src={URL.createObjectURL(t.result.thumb.blob)} alt="" style={{ width: 70, height: 70, objectFit: 'contain' }} />
-                      </td>
-                      <td>
-                        {warnings.length === 0 ? (
-                          <span className="pill">ok</span>
-                        ) : (
-                          warnings.map((w) => (
-                            <span key={w} className="pill" style={{ background: 'var(--red)', color: '#fff', marginRight: 4 }}>
-                              {w}
-                            </span>
-                          ))
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
       </div>
-    </>
+    </Modal>
   );
 }
 
@@ -690,7 +505,7 @@ function PreviewStat({ label, value, warn }: { label: string; value: number; war
   return (
     <div className="card" style={{ padding: 14 }}>
       <div className="hint">{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: warn && value > 0 ? 'var(--red)' : 'var(--navy)' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: warn && value > 0 ? 'var(--red)' : 'var(--navy)' }}>{value}</div>
     </div>
   );
 }

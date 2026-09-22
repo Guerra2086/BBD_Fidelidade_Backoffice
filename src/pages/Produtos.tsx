@@ -9,13 +9,16 @@ import { eur } from '../lib/orders';
 import { downloadCsv } from '../lib/csv';
 import { slugify } from '../lib/text';
 import { getOrCreateCategory } from '../lib/categories';
-import { runImagePipeline, regenerateInWorker } from '../lib/imageQueue';
+import { processOneInWorker, regenerateInWorker, terminateImageWorker } from '../lib/imageQueue';
 import { uploadProcessedImage, uploadRegeneratedSquares, deleteProductImageFiles } from '../lib/storageUpload';
+import { Pagination, paginate } from '../components/Pagination';
+import { ImportModal } from '../components/ImportModal';
 import type { Category, Product, ProductImage, Enquadramento, QualityFlags } from '../types';
 
 const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
 const MAXF = 12;
 const NOVA_CATEGORIA = '__nova__';
+const PAGE_SIZE = 10;
 
 function hasQualityWarning(flags: QualityFlags | null | undefined) {
   if (!flags) return false;
@@ -64,6 +67,9 @@ export function Produtos() {
   const [search, setSearch] = useState(params.get('q') ?? '');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [fotoFiltro, setFotoFiltro] = useState<FotoFiltro | ''>('');
+  const [page, setPage] = useState(1);
+  const [importOpen, setImportOpen] = useState(false);
+  const [reprocessing, setReprocessing] = useState<{ done: number; total: number } | null>(null);
   const [editing, setEditing] = useState<FormState | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -149,6 +155,9 @@ export function Produtos() {
       }),
     [products, search, categoryFilter, fotoFiltro],
   );
+
+  useEffect(() => setPage(1), [search, categoryFilter, fotoFiltro]);
+  const { pageItems: pagedProducts, totalPages, safePage } = paginate(filtered, page, PAGE_SIZE);
 
   const stockMutation = useMutation({
     mutationFn: async ({ id, delta }: { id: string; delta: number }) => {
@@ -251,32 +260,23 @@ export function Produtos() {
 
     setUploading(true);
     let posicao = current.length;
-    await runImagePipeline(
-      accepted.map((f, i) => ({ id: String(i), file: f })),
-      {
-        onItem: async (outcome) => {
-          if (!outcome.result) {
-            toast(`Erro ao processar ${accepted[Number(outcome.id)]?.name ?? 'foto'}`, 'err');
-            return;
-          }
-          const file = accepted[Number(outcome.id)];
-          try {
-            const paths = await uploadProcessedImage(supabase, productId, file.name, outcome.result);
-            const thisPos = posicao++;
-            await supabase.from('product_images').insert({
-              product_id: productId,
-              posicao: thisPos,
-              capa: thisPos === 0,
-              ...paths,
-              quality_flags: outcome.result.quality_flags,
-              enquadramento: outcome.result.enquadramento,
-            });
-          } catch {
-            toast(`Erro ao enviar ${file.name}`, 'err');
-          }
-        },
-      },
-    );
+    for (const file of accepted) {
+      try {
+        const result = await processOneInWorker(file);
+        const paths = await uploadProcessedImage(supabase, productId, file.name, result);
+        const thisPos = posicao++;
+        await supabase.from('product_images').insert({
+          product_id: productId,
+          posicao: thisPos,
+          capa: thisPos === 0,
+          ...paths,
+          quality_flags: result.quality_flags,
+          enquadramento: result.enquadramento,
+        });
+      } catch {
+        toast(`Erro ao enviar ${file.name}`, 'err');
+      }
+    }
     setUploading(false);
     queryClient.invalidateQueries({ queryKey: ['products'] });
   }
@@ -302,12 +302,11 @@ export function Produtos() {
     await persistGalleryOrder(remaining);
   }
   async function reprocessFoto(img: ProductImage) {
+    if (!editing?.id) return;
     try {
       const blob = await (await fetch(img.original_path)).blob();
-      const results = await runImagePipeline([{ id: img.id, file: blob }]);
-      const outcome = results.get(img.id);
-      if (!outcome?.result || !editing?.id) throw new Error(outcome?.error ?? 'falhou');
-      const paths = await uploadProcessedImage(supabase, editing.id, img.id, outcome.result);
+      const result = await processOneInWorker(blob);
+      const paths = await uploadProcessedImage(supabase, editing.id, img.id, result);
       await supabase
         .from('product_images')
         .update({
@@ -316,8 +315,8 @@ export function Produtos() {
           thumb_path: paths.thumb_path,
           largura: paths.largura,
           altura: paths.altura,
-          quality_flags: outcome.result.quality_flags,
-          enquadramento: outcome.result.enquadramento,
+          quality_flags: result.quality_flags,
+          enquadramento: result.enquadramento,
         })
         .eq('id', img.id);
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -325,6 +324,43 @@ export function Produtos() {
     } catch {
       toast('Não foi possível reprocessar esta foto', 'err');
     }
+  }
+
+  async function reprocessAll() {
+    const { data: images, error } = await supabase.from('product_images').select('*').returns<ProductImage[]>();
+    if (error || !images) {
+      toast('Não foi possível carregar as fotos existentes', 'err');
+      return;
+    }
+    setReprocessing({ done: 0, total: images.length });
+    let ok = 0;
+    for (const img of images) {
+      try {
+        const blob = await (await fetch(img.original_path)).blob();
+        const result = await processOneInWorker(blob);
+        const paths = await uploadProcessedImage(supabase, img.product_id, img.id, result);
+        await supabase
+          .from('product_images')
+          .update({
+            large_path: paths.large_path,
+            medium_path: paths.medium_path,
+            thumb_path: paths.thumb_path,
+            largura: paths.largura,
+            altura: paths.altura,
+            quality_flags: result.quality_flags,
+            enquadramento: result.enquadramento,
+          })
+          .eq('id', img.id);
+        ok++;
+      } catch {
+        /* mantém a foto anterior se o reprocessamento desta falhar, e continua para a seguinte */
+      }
+      setReprocessing((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev));
+    }
+    terminateImageWorker();
+    setReprocessing(null);
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    toast('Reprocessamento concluído', 'ok', `${ok} de ${images.length} fotos`);
   }
 
   async function handleNovaCategoria() {
@@ -372,6 +408,14 @@ export function Produtos() {
           >
             <Icon name="down" />
             Exportar CSV
+          </button>
+          <button className="btn btn-line" onClick={reprocessAll} disabled={!!reprocessing}>
+            <Icon name="refresh" />
+            {reprocessing ? `A reprocessar… ${reprocessing.done}/${reprocessing.total}` : 'Reprocessar todas as imagens'}
+          </button>
+          <button className="btn btn-line" onClick={() => setImportOpen(true)}>
+            <Icon name="upload" />
+            Importar
           </button>
           <button className="btn btn-red" onClick={() => openEdit()}>
             <Icon name="plus" />
@@ -436,7 +480,7 @@ export function Produtos() {
                 </td>
               </tr>
             ) : (
-              filtered.map((p) => {
+              pagedProducts.map((p) => {
                 const low = p.stock > 0 && p.stock <= 3;
                 const limite = categoryLimite(p.category_id);
                 const imagens = p.imagens ?? [];
@@ -551,6 +595,7 @@ export function Produtos() {
           </tbody>
         </table>
       </div>
+      <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
 
       <Modal
         open={!!editing}
@@ -822,6 +867,8 @@ export function Produtos() {
       />
 
       {lightboxFor && <Lightbox {...lightboxFor} onClose={() => setLightboxFor(null)} />}
+
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} />}
 
       {cropFor && editing?.id && (
         <EnquadramentoEditor
