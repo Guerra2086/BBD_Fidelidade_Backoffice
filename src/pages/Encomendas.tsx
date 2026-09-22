@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { callAdminApi } from '../lib/api';
 import type { Order, OrderItem } from '../types';
 
 const ESTADOS: Order['estado'][] = ['pendente', 'confirmada', 'pronta_levantamento', 'entregue', 'cancelada'];
@@ -39,6 +40,9 @@ export function Encomendas({ onlyPending = false }: { onlyPending?: boolean }) {
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc('cancel_order', { p_order_id: id });
       if (error) throw error;
+      await callAdminApi('send-order-email', { orderId: id, templateKey: 'order_cancelled' }).catch(() => {
+        // o cancelamento já foi aplicado; a falha a enviar o email não deve bloquear o fluxo
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });

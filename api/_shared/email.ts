@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabaseAdmin.ts';
+import { supabaseAdmin } from './supabaseAdmin';
 
 export type TemplateVars = {
   nome: string;
@@ -32,14 +32,10 @@ export async function sendTemplatedEmail(templateKey: string, to: string, vars: 
     return { sent: false, reason: 'template_indisponivel' };
   }
 
-  const { data: settingRow } = await admin
-    .from('site_settings')
-    .select('value')
-    .eq('key', 'email_sender_address')
-    .maybeSingle();
+  const { data: settingRow } = await admin.from('site_settings').select('value').eq('key', 'email_sender_address').maybeSingle();
   const sender = (settingRow?.value as { address?: string } | null)?.address || 'campanhas.bbd@entrajuda.pt';
 
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     console.error('RESEND_API_KEY não configurado — email não enviado.');
     return { sent: false, reason: 'resend_nao_configurado' };

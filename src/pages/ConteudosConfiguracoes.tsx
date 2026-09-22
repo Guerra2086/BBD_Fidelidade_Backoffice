@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { callAdminApi } from '../lib/api';
 
 type SettingRow = { key: string; value: Record<string, unknown> };
 type EmailTemplate = { key: string; nome: string; assunto: string; corpo_html: string; ativo: boolean };
@@ -64,24 +65,22 @@ export function ConteudosConfiguracoes() {
 
   async function handlePasswordUpdate() {
     setPasswordMsg(null);
-    const { data, error } = await supabase.functions.invoke('admin-set-password', { body: { password: newPassword } });
-    if (error || data?.error) {
-      setPasswordMsg(data?.message || 'Erro ao atualizar a palavra-passe.');
-    } else {
+    try {
+      await callAdminApi('admin-set-password', { password: newPassword });
       setPasswordMsg('Palavra-passe atualizada ✓');
       setNewPassword('');
+    } catch (e) {
+      setPasswordMsg(e instanceof Error ? e.message : 'Erro ao atualizar a palavra-passe.');
     }
   }
 
   async function handleSendTest() {
     setTestMsg(null);
-    const { data, error } = await supabase.functions.invoke('send-test-email', {
-      body: { templateKey: testTemplate, to: testEmailTo },
-    });
-    if (error || !data?.sent) {
-      setTestMsg('Não foi possível enviar o email de teste.');
-    } else {
+    try {
+      await callAdminApi<{ sent: boolean }>('send-test-email', { templateKey: testTemplate, to: testEmailTo });
       setTestMsg(`Email de teste enviado para ${testEmailTo} ✓`);
+    } catch {
+      setTestMsg('Não foi possível enviar o email de teste.');
     }
   }
 

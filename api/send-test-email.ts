@@ -1,20 +1,18 @@
-import { handleOptions, json } from '../_shared/cors.ts';
-import { verifyAdminRequest } from '../_shared/adminAuth.ts';
-import { sendTemplatedEmail } from '../_shared/email.ts';
+import { verifyAdminRequest } from './_shared/adminAuth';
+import { sendTemplatedEmail } from './_shared/email';
+
+export const config = { runtime: 'edge' };
 
 // Usado pelo editor de templates no backoffice: envia uma pré-visualização
 // com dados de exemplo para o email indicado pelo admin.
-Deno.serve(async (req) => {
-  const preflight = handleOptions(req);
-  if (preflight) return preflight;
-
+export default async function handler(req: Request): Promise<Response> {
   if (!(await verifyAdminRequest(req))) {
-    return json({ error: 'nao_autorizado' }, 401);
+    return Response.json({ error: 'nao_autorizado' }, { status: 401 });
   }
 
   const { templateKey, to } = await req.json().catch(() => ({ templateKey: null, to: null }));
   if (!templateKey || !to) {
-    return json({ error: 'dados_em_falta' }, 400);
+    return Response.json({ error: 'dados_em_falta' }, { status: 400 });
   }
 
   const result = await sendTemplatedEmail(templateKey, to, {
@@ -24,5 +22,5 @@ Deno.serve(async (req) => {
     total: '12.00 €',
   });
 
-  return json(result, result.sent ? 200 : 500);
-});
+  return Response.json(result, { status: result.sent ? 200 : 500 });
+}
