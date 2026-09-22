@@ -1,17 +1,18 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin } from './_shared/supabaseAdmin';
-import { verifyAdminRequest } from './_shared/adminAuth';
+import { verifyAdmin } from './_shared/adminAuth';
 
-export const config = { runtime: 'edge' };
-
-export default async function handler(req: Request): Promise<Response> {
-  if (!(await verifyAdminRequest(req))) {
-    return Response.json({ error: 'nao_autorizado' }, { status: 401 });
+// Runtime Node normal (não Edge): bcryptjs usa o módulo `crypto` do Node,
+// que o Edge Runtime do Vercel não suporta.
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!(await verifyAdmin(req.headers.authorization))) {
+    return res.status(401).json({ error: 'nao_autorizado' });
   }
 
-  const { password } = (await req.json().catch(() => ({ password: null }))) as { password?: string | null };
+  const { password } = (req.body ?? {}) as { password?: string | null };
   if (!password || typeof password !== 'string' || password.length < 6) {
-    return Response.json({ error: 'password_invalida', message: 'A palavra-passe deve ter pelo menos 6 caracteres.' }, { status: 400 });
+    return res.status(400).json({ error: 'password_invalida', message: 'A palavra-passe deve ter pelo menos 6 caracteres.' });
   }
 
   const hash = bcrypt.hashSync(password, 10);
@@ -23,8 +24,8 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (error) {
     console.error(error);
-    return Response.json({ error: 'erro_ao_guardar' }, { status: 500 });
+    return res.status(500).json({ error: 'erro_ao_guardar' });
   }
 
-  return Response.json({ updated: true });
+  return res.status(200).json({ updated: true });
 }
