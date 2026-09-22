@@ -17,7 +17,8 @@ const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
 const MAXF = 12;
 const NOVA_CATEGORIA = '__nova__';
 
-function hasQualityWarning(flags: QualityFlags) {
+function hasQualityWarning(flags: QualityFlags | null | undefined) {
+  if (!flags) return false;
   return Object.entries(flags).some(([k, v]) => v && k !== 'needs_reprocessing');
 }
 

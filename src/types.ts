@@ -58,7 +58,7 @@ export type ProductImage = {
   thumb_path: string;
   largura: number | null;
   altura: number | null;
-  quality_flags: QualityFlags;
+  quality_flags: QualityFlags | null;
   enquadramento: Enquadramento | null;
   created_at: string;
   updated_at: string;
