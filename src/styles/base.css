@@ -1,0 +1,39 @@
+:root{
+  --navy:#002C77;--navy-2:#0A3C94;--navy-3:#001A4A;
+  --red:#E4002B;--red-dark:#B80022;--red-soft:#FDE8EC;
+  --paper:#F6F1E8;--paper-2:#EFE7D8;
+  --kraft:#C8A274;--kraft-dark:#A9834F;
+  --ink:#121826;--muted:#5B6275;--line:rgba(18,24,38,.10);
+  --green:#1E8E5A;--green-soft:#E3F4EA;--amber:#B86E00;--amber-soft:#FFF1D9;--blue-soft:#E6EDF8;
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5}
+h1,h2,h3,h4{font-family:"Space Grotesk",Inter,sans-serif;letter-spacing:-.02em;line-height:1.1}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+
+/* ---------- Buttons ---------- */
+.btn{text-decoration:none;display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 18px;border-radius:12px;font-weight:600;white-space:nowrap;transition:transform .12s,box-shadow .15s,background .15s}
+.btn-red{background:var(--red);color:#fff;box-shadow:0 4px 0 var(--red-dark)}
+.btn-red:hover{transform:translateY(-1px);box-shadow:0 5px 0 var(--red-dark)}
+.btn-red:active{transform:translateY(3px);box-shadow:0 1px 0 var(--red-dark)}
+.btn-navy{background:var(--navy);color:#fff;box-shadow:0 4px 0 var(--navy-3)}
+.btn-navy:active{transform:translateY(3px);box-shadow:0 1px 0 var(--navy-3)}
+.btn-line{background:#fff;border:1.5px solid var(--line)}
+.btn-line:hover{border-color:var(--navy);color:var(--navy)}
+.btn-ghost{color:var(--muted)}.btn-ghost:hover{color:var(--ink);background:rgba(0,0,0,.04)}
+.btn-danger{background:var(--red-soft);color:var(--red-dark)}
+.btn-danger:hover{background:#FBD3DB}
+.btn-sm{height:34px;padding:0 12px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.num{font-family:"Space Grotesk";font-weight:700}
+.empty{padding:50px 20px;text-align:center;color:var(--muted)}
+.mono{font-family:ui-monospace,monospace}
+.fade-in{animation:fin .35s ease}
+@keyframes fin{from{opacity:0;transform:translateY(8px)}}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}

@@ -19,7 +19,7 @@ export function Login() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--paper)' }}>
-      <div className="card-panel" style={{ width: 360 }}>
+      <div className="card" style={{ width: 360 }}>
         <h1 style={{ fontSize: 22, marginBottom: 6 }}>Backoffice — Segunda Vida</h1>
         <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>
           Acesso reservado à equipa do Banco de Bens Doados.

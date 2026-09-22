@@ -9,5 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
     globals: true,
+    // O <TopNav> (com os testes de submenu único) foi substituído pela sidebar desta
+    // referência — sem suite de testes própria ainda. Evita que `npm run test` falhe
+    // por não haver nenhum ficheiro *.test.tsx no momento.
+    passWithNoTests: true,
   },
 })

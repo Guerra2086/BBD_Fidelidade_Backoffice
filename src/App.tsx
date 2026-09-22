@@ -1,47 +1,52 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { TopNav } from './components/TopNav/TopNav';
+import { ToastProvider } from './context/ToastContext';
+import { Shell as AppShell } from './components/Shell';
 import { Login } from './pages/Login';
 import { SemAcesso } from './pages/SemAcesso';
 import { Dashboard } from './pages/Dashboard';
 import { Produtos } from './pages/Produtos';
-import { ProdutosRelatorios } from './pages/ProdutosRelatorios';
+import { Movimentos } from './pages/Movimentos';
+import { Categorias } from './pages/Categorias';
 import { Encomendas } from './pages/Encomendas';
+import { Relatorios } from './pages/Relatorios';
 import { Colaboradores } from './pages/Colaboradores';
 import { ChatbotFaqs } from './pages/ChatbotFaqs';
 import { ChatbotConversas } from './pages/ChatbotConversas';
 import { ConteudosImpacto } from './pages/ConteudosImpacto';
 import { ConteudosNewsletter } from './pages/ConteudosNewsletter';
-import { ConteudosConfiguracoes } from './pages/ConteudosConfiguracoes';
+import { Emails } from './pages/Emails';
+import { Definicoes } from './pages/Definicoes';
 import { Administradores } from './pages/Administradores';
 
 function Shell() {
-  const { session, isAdmin, loading, signOut } = useAuth();
+  const { session, isAdmin, loading } = useAuth();
 
   if (loading) return null;
   if (!session) return <Login />;
   if (!isAdmin) return <SemAcesso />;
 
   return (
-    <>
-      <TopNav userLabel={session.user.email ?? undefined} onSignOut={signOut} />
+    <AppShell>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/produtos" element={<Produtos />} />
-        <Route path="/produtos/relatorios" element={<ProdutosRelatorios />} />
+        <Route path="/movimentos" element={<Movimentos />} />
+        <Route path="/categorias" element={<Categorias />} />
         <Route path="/encomendas" element={<Encomendas />} />
-        <Route path="/encomendas/pendentes" element={<Encomendas onlyPending />} />
+        <Route path="/relatorios" element={<Relatorios />} />
         <Route path="/colaboradores" element={<Colaboradores />} />
         <Route path="/chatbot/faqs" element={<ChatbotFaqs />} />
         <Route path="/chatbot/conversas" element={<ChatbotConversas />} />
         <Route path="/conteudos/impacto" element={<ConteudosImpacto />} />
         <Route path="/conteudos/newsletter" element={<ConteudosNewsletter />} />
-        <Route path="/conteudos/configuracoes" element={<ConteudosConfiguracoes />} />
+        <Route path="/emails" element={<Emails />} />
+        <Route path="/definicoes" element={<Definicoes />} />
         <Route path="/administradores" element={<Administradores />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </AppShell>
   );
 }
 
@@ -50,11 +55,13 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Shell />
-        </AuthProvider>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Shell />
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

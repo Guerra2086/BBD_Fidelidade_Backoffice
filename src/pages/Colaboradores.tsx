@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { eur } from '../lib/orders';
 import type { Order } from '../types';
 
 export function Colaboradores() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*').neq('estado', 'cancelada');
+      const { data, error } = await supabase.from('orders').select('*').neq('estado', 'cancelada').neq('estado', 'expirada');
       if (error) throw error;
       return data as Order[];
     },
@@ -25,38 +26,51 @@ export function Colaboradores() {
   }, [orders]);
 
   return (
-    <div className="page">
-      <h1>Colaboradores</h1>
-      <p style={{ color: 'var(--muted)', marginBottom: 16, fontSize: 13 }}>
-        Não há contas de colaborador (loja sem login individual) — agregado a partir do nome/email indicados em cada encomenda.
-      </p>
-      {isLoading ? (
-        <p style={{ color: 'var(--muted)' }}>A carregar…</p>
-      ) : (
-        <div className="card-panel" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', background: 'var(--paper)' }}>
-                {['Nome', 'Email', 'N.º encomendas', 'Total gasto'].map((h) => (
-                  <th key={h} style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.email} style={{ borderTop: '1px solid var(--line)' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{r.nome}</td>
-                  <td style={{ padding: '12px 16px' }}>{r.email}</td>
-                  <td style={{ padding: '12px 16px' }}>{r.encomendas}</td>
-                  <td style={{ padding: '12px 16px' }}>{r.totalGasto.toFixed(2)} €</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Colaboradores</h1>
+          <p>Não há contas individuais (loja sem login) — agregado a partir do nome/email indicados em cada encomenda.</p>
         </div>
-      )}
-    </div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>N.º encomendas</th>
+              <th>Total gasto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={4}>
+                  <div className="empty">A carregar…</div>
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={4}>
+                  <div className="empty">Ainda sem encomendas.</div>
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.email}>
+                  <td>
+                    <b>{r.nome}</b>
+                  </td>
+                  <td>{r.email}</td>
+                  <td>{r.encomendas}</td>
+                  <td className="num">{eur(r.totalGasto)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

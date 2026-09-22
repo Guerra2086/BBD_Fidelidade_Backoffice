@@ -35,23 +35,24 @@ export function ConteudosImpacto() {
   });
 
   return (
-    <div className="page">
-      <h1>Números de impacto</h1>
-      <div className="card-panel" style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Números de impacto</h1>
+          <p>Contadores mostrados na secção de impacto da loja.</p>
+        </div>
+      </div>
+      <div className="card form" style={{ maxWidth: 480 }}>
         {stats.map((s) => (
-          <label key={s.key} style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>{s.label}</span>
-            <input
-              value={values[s.key] ?? ''}
-              onChange={(e) => setValues({ ...values, [s.key]: e.target.value })}
-              style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)' }}
-            />
-          </label>
+          <div className="f" key={s.key}>
+            <label>{s.label}</label>
+            <input value={values[s.key] ?? ''} onChange={(e) => setValues({ ...values, [s.key]: e.target.value })} />
+          </div>
         ))}
         <button className="btn btn-red" style={{ justifySelf: 'start' }} onClick={() => saveMutation.mutate()}>
           {saveMutation.isPending ? 'A guardar…' : saved ? 'Guardado ✓' : 'Guardar'}
         </button>
       </div>
-    </div>
+    </>
   );
 }

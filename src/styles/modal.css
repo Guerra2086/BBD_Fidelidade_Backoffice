@@ -1,0 +1,48 @@
+/* ---------- Modal ---------- */
+.overlay{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(0,20,60,.42);backdrop-filter:blur(4px);opacity:0;transition:opacity .25s}
+.overlay.on{opacity:1}
+.modal{width:min(560px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;background:var(--paper);border-radius:24px;box-shadow:0 40px 90px -30px rgba(0,0,0,.55);transform:translateY(24px) scale(.96);transition:transform .35s cubic-bezier(.2,1.3,.4,1);overflow:hidden}
+.overlay.on .modal{transform:none}
+.modal.lg{width:min(820px,100%)}
+.modal.xl{width:min(1040px,100%)}
+.m-head{display:flex;align-items:flex-start;gap:14px;padding:22px 24px 18px;background:#fff;border-bottom:1px solid var(--line)}
+.m-head .mi{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--blue-soft);color:var(--navy);flex:0 0 44px}
+.m-head .mi.red{background:var(--red-soft);color:var(--red)}
+.m-head .mi.green{background:var(--green-soft);color:var(--green)}
+.m-head h3{font-size:20px;color:var(--navy)}
+.m-head p{color:var(--muted);font-size:13px;margin-top:3px}
+.m-head .x{margin-left:auto;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--muted);flex:0 0 38px}
+.m-head .x:hover{background:var(--paper-2);color:var(--ink)}
+.m-body{padding:22px 24px;overflow:auto;flex:1}
+.m-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;background:#fff;border-top:1px solid var(--line);flex-wrap:wrap}
+.m-foot .left{margin-right:auto}
+.confirm .m-body{font-size:15px}
+
+/* forms */
+.form{display:grid;gap:16px}
+.form .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form .cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.f label,.f .l{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+.f label small,.f .l small{font-weight:400;color:var(--muted)}
+.f input:not([type=checkbox]):not([type=radio]),.f select,.f textarea{width:100%;height:44px;padding:0 14px;border-radius:12px;border:1.5px solid var(--line);background:#fff;outline:0;transition:border-color .15s,box-shadow .15s}
+.f textarea{height:auto;padding:12px 14px;resize:vertical;min-height:120px;line-height:1.5}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--navy);box-shadow:0 0 0 4px rgba(0,44,119,.1)}
+.f .hint{font-size:12px;color:var(--muted);margin-top:6px}
+.f.err input,.f.err select,.f.err textarea{border-color:var(--red)}
+.f.err .hint{color:var(--red)}
+.input-suffix{position:relative}
+.input-suffix span{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;pointer-events:none}
+.input-suffix button{position:absolute;right:6px;top:6px;height:32px;padding:0 10px;border-radius:8px;color:var(--navy);font-weight:600;font-size:12px}
+.input-suffix button:hover{background:var(--paper-2)}
+.icon-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px}
+.icon-pick button{aspect-ratio:1;border-radius:12px;background:#fff;border:1.5px solid var(--line);display:grid;place-items:center}
+.icon-pick button svg{width:28px;height:28px;stroke:var(--navy);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.icon-pick button.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;background:#fff;border:1.5px solid var(--line);border-radius:14px}
+.switch-row b{display:block;font-size:14px}
+.switch-row span{font-size:12px;color:var(--muted)}
+.seg{display:inline-flex;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{height:36px;padding:0 14px;border-radius:9px;font-weight:600;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--navy);color:#fff}
+.meter{height:6px;border-radius:3px;background:var(--paper-2);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;transition:width .3s,background .3s}

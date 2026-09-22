@@ -18,14 +18,21 @@ estar ainda migrada — **nunca usar em produção**.
 As funções em `api/` (`admin-set-password`, `send-test-email`, `send-order-email`) só correm mesmo com
 `vercel dev` (Vercel CLI), não com `vite dev` — para as testares localmente usa `vercel dev` em vez de `npm run dev`.
 
+## Layout
+
+O visual segue [`referencia/backoffice-segunda-vida.html`](referencia/backoffice-segunda-vida.html) — sidebar fixa
+à esquerda (agrupada por Geral/Catálogo/Análise/Chatbot/Conteúdos/Configuração) em vez do menu horizontal com
+submenus do brief original. CSS portado quase literalmente para `src/styles/` (base, layout, cards, table, modal,
+gallery, feature, responsive).
+
 ## Testes
 
 ```bash
 npm run test
 ```
 
-Cobre sobretudo o `<TopNav>` (`src/components/TopNav/TopNav.test.tsx`): um só submenu aberto de cada vez, toggle,
-fecho ao navegar, fecho ao clicar fora e no Esc com foco de volta ao trigger.
+Sem suite própria neste momento — o `<TopNav>` com testes (um só submenu aberto, toggle, fecho ao navegar/clicar
+fora/Esc) foi substituído pela sidebar desta referência, que ainda não tem testes equivalentes.
 
 ## Arquitetura: Supabase é só a base de dados
 
@@ -46,8 +53,20 @@ disponíveis assim que a migração é aplicada.
 
 ## Base de dados (Supabase)
 
-Aplica `supabase/migrations/0001_init.sql` no **SQL Editor** do dashboard da Supabase (Dashboard → SQL Editor →
-New query → cola o ficheiro → Run). Não precisas do Supabase CLI para isto.
+Aplica as migrações por ordem no **SQL Editor** do dashboard da Supabase (Dashboard → SQL Editor → New query →
+cola o ficheiro → Run) — não precisas do Supabase CLI para isto:
+
+1. `supabase/migrations/0001_init.sql` — esquema base, RLS, seed.
+2. `supabase/migrations/0002_backoffice_v2.sql` — movimentos de stock, histórico de encomendas, limite por
+   categoria generalizado, estado "expirada", `adjust_stock`/`mark_order_ready`/`register_order_payment`/
+   `expire_old_orders`.
+3. `supabase/migrations/0003_backoffice_v2_extras.sql` — templates de email em falta + permissão para o botão
+   "Simular encomenda" chamar `place_order` a partir de uma sessão de admin.
+
+`expire_old_orders()` só cancela reservas expiradas quando é chamada — não corre sozinha. Para automatizar,
+configura um **Vercel Cron** (`vercel.json` → `crons`) a chamar uma função `api/` que a invoque com a
+`service_role` key, com a frequência que preferires (ex.: uma vez por dia). Ainda não está feito — fica como
+TODO(Rodrigo) até decidirmos a frequência.
 
 ### Segredos das funções `api/` (definir no Vercel, nunca no Supabase)
 
@@ -91,7 +110,7 @@ dentro do backoffice (chama `api/admin-create-user.ts`, que usa a `service_role`
 ### Password do site por omissão
 
 A seed define a palavra-passe **`segunda-vida`** (hash bcrypt em `site_settings.site_password_hash`). Muda-a assim
-que possível em **Conteúdos → Configurações**, que chama `api/admin-set-password.ts`.
+que possível em **Definições → Acesso à loja**, que chama `api/admin-set-password.ts`.
 
 ## Deploy (Vercel)
 

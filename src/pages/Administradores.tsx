@@ -43,65 +43,65 @@ export function Administradores() {
   }
 
   return (
-    <div className="page">
-      <h1>Administradores</h1>
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Administradores</h1>
+          <p>Contas com acesso ao backoffice.</p>
+        </div>
+      </div>
 
-      <div className="card-panel" style={{ maxWidth: 420, marginBottom: 24 }}>
-        <h3 style={{ fontSize: 16, marginBottom: 12 }}>Criar novo administrador</h3>
-        <form onSubmit={handleCreate} style={{ display: 'grid', gap: 10 }}>
-          <input
-            required
-            placeholder="Nome"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)' }}
-          />
-          <input
-            required
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)' }}
-          />
-          <input
-            required
-            type="password"
-            placeholder="Palavra-passe (mín. 6 caracteres)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)' }}
-          />
+      <div className="card form" style={{ maxWidth: 420, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 16 }}>Criar novo administrador</h3>
+        <form onSubmit={handleCreate} className="form">
+          <div className="f">
+            <label>Nome</label>
+            <input required value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+          <div className="f">
+            <label>Email</label>
+            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="f">
+            <label>Palavra-passe (mín. 6 caracteres)</label>
+            <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
           <button className="btn btn-red" type="submit" disabled={creating} style={{ justifySelf: 'start' }}>
             {creating ? 'A criar…' : 'Criar conta'}
           </button>
           {error && <p style={{ color: 'var(--red)', fontSize: 13 }}>{error}</p>}
-          {success && <p style={{ color: 'var(--ok)', fontSize: 13 }}>{success}</p>}
+          {success && <p style={{ color: 'var(--green)', fontSize: 13 }}>{success}</p>}
         </form>
       </div>
 
-      {isLoading ? (
-        <p style={{ color: 'var(--muted)' }}>A carregar…</p>
-      ) : (
-        <div className="card-panel" style={{ padding: 0, overflow: 'hidden', maxWidth: 560 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', background: 'var(--paper)' }}>
-                <th style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>Nome</th>
-                <th style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>Email</th>
+      <div className="table-wrap" style={{ maxWidth: 560 }}>
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={2}>
+                  <div className="empty">A carregar…</div>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {admins.map((a) => (
-                <tr key={a.id} style={{ borderTop: '1px solid var(--line)' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{a.nome}</td>
-                  <td style={{ padding: '12px 16px' }}>{a.email}</td>
+            ) : (
+              admins.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <b>{a.nome}</b>
+                  </td>
+                  <td>{a.email}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

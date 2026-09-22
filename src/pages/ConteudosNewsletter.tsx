@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { Icon } from '../lib/icons';
 
 type Subscriber = { email: string; created_at: string };
 
 function downloadCsv(filename: string, rows: string[][]) {
-  const csv = rows.map((r) => r.map((v) => `"${v.replaceAll('"', '""')}"`).join(',')).join('\n');
+  const csv = '﻿' + rows.map((r) => r.map((v) => `"${v.replaceAll('"', '""')}"`).join(';')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -25,37 +26,48 @@ export function ConteudosNewsletter() {
   });
 
   return (
-    <div className="page">
-      <h1>Newsletter</h1>
-      <button
-        className="btn btn-ghost"
-        style={{ marginBottom: 16 }}
-        onClick={() => downloadCsv('newsletter.csv', [['Email', 'Subscrito em'], ...subscribers.map((s) => [s.email, s.created_at])])}
-      >
-        Exportar CSV
-      </button>
-      {isLoading ? (
-        <p style={{ color: 'var(--muted)' }}>A carregar…</p>
-      ) : (
-        <div className="card-panel" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', background: 'var(--paper)' }}>
-                <th style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>Email</th>
-                <th style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)' }}>Subscrito em</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subscribers.map((s) => (
-                <tr key={s.email} style={{ borderTop: '1px solid var(--line)' }}>
-                  <td style={{ padding: '12px 16px' }}>{s.email}</td>
-                  <td style={{ padding: '12px 16px' }}>{new Date(s.created_at).toLocaleDateString('pt-PT')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Newsletter</h1>
+          <p>{subscribers.length} subscritores.</p>
         </div>
-      )}
-    </div>
+        <div className="actions">
+          <button
+            className="btn btn-line"
+            onClick={() => downloadCsv('newsletter.csv', [['Email', 'Subscrito em'], ...subscribers.map((s) => [s.email, s.created_at])])}
+          >
+            <Icon name="down" />
+            Exportar CSV
+          </button>
+        </div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Subscrito em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={2}>
+                  <div className="empty">A carregar…</div>
+                </td>
+              </tr>
+            ) : (
+              subscribers.map((s) => (
+                <tr key={s.email}>
+                  <td>{s.email}</td>
+                  <td>{new Date(s.created_at).toLocaleDateString('pt-PT')}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

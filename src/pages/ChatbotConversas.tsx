@@ -28,14 +28,19 @@ export function ChatbotConversas() {
   });
 
   return (
-    <div className="page">
-      <h1>Conversas do chatbot</h1>
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Conversas do chatbot</h1>
+          <p>Histórico das conversas com o assistente da loja.</p>
+        </div>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16 }}>
-        <div className="card-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {isLoading ? (
-            <p style={{ padding: 16, color: 'var(--muted)' }}>A carregar…</p>
+            <div className="empty">A carregar…</div>
           ) : conversations.length === 0 ? (
-            <p style={{ padding: 16, color: 'var(--muted)' }}>Sem conversas para mostrar ainda.</p>
+            <div className="empty">Sem conversas para mostrar ainda.</div>
           ) : (
             conversations.map((c) => (
               <button
@@ -56,14 +61,14 @@ export function ChatbotConversas() {
             ))
           )}
         </div>
-        <div className="card-panel" style={{ minHeight: 200 }}>
+        <div className="card" style={{ minHeight: 200 }}>
           {!selected ? (
             <p style={{ color: 'var(--muted)' }}>Seleciona uma conversa para ver as mensagens.</p>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {messages.map((m) => (
                 <div key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <span className={`badge ${m.role === 'user' ? 'red' : 'navy'}`}>{m.role === 'user' ? 'Colaborador' : 'Assistente'}</span>
+                  <span className={`pill ${m.role === 'user' ? 'red' : ''}`}>{m.role === 'user' ? 'Colaborador' : 'Assistente'}</span>
                   <p style={{ marginTop: 4 }}>{m.conteudo}</p>
                 </div>
               ))}
@@ -71,6 +76,6 @@ export function ChatbotConversas() {
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }
