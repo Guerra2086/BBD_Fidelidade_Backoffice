@@ -1,0 +1,34 @@
+project_id = "slhsfjryqgryfvmduxnj"
+
+# Funções do frontoffice (loja): usam o "gate token" próprio, não uma sessão
+# Supabase Auth — por isso verify_jwt = false. A autorização é feita à mão
+# em cada função com verifyGateToken() (ver supabase/functions/_shared/gate.ts).
+[functions.gate-login]
+verify_jwt = false
+
+[functions.get-storefront-data]
+verify_jwt = false
+
+[functions.place-order]
+verify_jwt = false
+
+[functions.newsletter-subscribe]
+verify_jwt = false
+
+[functions.order-lookup]
+verify_jwt = false
+
+[functions.chat]
+verify_jwt = false
+
+# Funções do backoffice: exigem uma sessão Supabase Auth real de um admin.
+# verify_jwt = true valida a assinatura do JWT antes de a função correr;
+# dentro da função confirmamos ainda is_admin() via RPC (ver _shared/adminAuth.ts).
+[functions.send-order-email]
+verify_jwt = true
+
+[functions.send-test-email]
+verify_jwt = true
+
+[functions.admin-set-password]
+verify_jwt = true

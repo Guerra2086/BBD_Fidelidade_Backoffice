@@ -1,0 +1,40 @@
+/* Tokens de design partilhados com o frontoffice (frontoffice/src/styles/base.css).
+   O backoffice é mais sóbrio/denso: sem animações decorativas, mas a mesma marca. */
+:root{
+  --navy:#002C77;
+  --navy-2:#0A3C94;
+  --red:#E4002B;
+  --red-dark:#B80022;
+  --paper:#F6F1E8;
+  --paper-2:#EFE7D8;
+  --kraft:#C8A274;
+  --kraft-dark:#A9834F;
+  --ink:#121826;
+  --muted:#5B6275;
+  --line:rgba(18,24,38,.12);
+  --radius:16px;
+  --ok:#1A7F4E;
+  --warn:#B8860B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.5}
+h1,h2,h3,h4{font-family:"Space Grotesk",Inter,sans-serif;letter-spacing:-.01em;color:var(--navy)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;font-weight:600;border:0;transition:transform .15s,box-shadow .2s}
+.btn-red{background:var(--red);color:#fff;box-shadow:0 4px 0 var(--red-dark)}
+.btn-red:hover{transform:translateY(-1px)}
+.btn-red:active{transform:translateY(2px);box-shadow:0 1px 0 var(--red-dark)}
+.btn-ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+.btn-ghost:hover{border-color:var(--navy)}
+
+.card-panel{background:#fff;border-radius:var(--radius);border:1px solid var(--line);padding:20px}
+
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.badge.navy{background:#E8EEF8;color:var(--navy)}
+.badge.red{background:#FCE6EA;color:var(--red)}
+.badge.ok{background:#E4F4EC;color:var(--ok)}
+.badge.warn{background:#FBF0DC;color:var(--warn)}
+.badge.muted{background:var(--paper-2);color:var(--muted)}
