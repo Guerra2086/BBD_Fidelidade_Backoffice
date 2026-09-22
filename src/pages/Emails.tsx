@@ -74,7 +74,12 @@ export function Emails() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [senderOpen, setSenderOpen] = useState(false);
 
-  const { data: templates = [] } = useQuery({
+  const {
+    data: templates = [],
+    isLoading: loadingTemplates,
+    isError: templatesError,
+    refetch: refetchTemplates,
+  } = useQuery({
     queryKey: ['email_templates'],
     queryFn: async () => {
       const { data, error } = await supabase.from('email_templates').select('*').order('key');
@@ -125,6 +130,30 @@ export function Emails() {
           </button>
         </div>
       </div>
+
+      {loadingTemplates && <p className="hint">A carregar os templates de email…</p>}
+
+      {templatesError && (
+        <div className="note red">
+          <Icon name="alert" />
+          <div>
+            Não foi possível carregar os templates de email.{' '}
+            <button className="btn btn-line btn-sm" onClick={() => refetchTemplates()}>
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loadingTemplates && !templatesError && templates.length === 0 && (
+        <div className="note amber">
+          <Icon name="alert" />
+          <div>
+            Ainda não há templates de email na base de dados — falta correr as migrações
+            <code> 0001_init.sql</code> e <code>0003_backoffice_v2_extras.sql</code> no SQL Editor da Supabase.
+          </div>
+        </div>
+      )}
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(420px,1fr))' }}>
         {templates.map((t) => {
