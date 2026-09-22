@@ -10,7 +10,10 @@ export default async function handler(req: Request): Promise<Response> {
     return Response.json({ error: 'nao_autorizado' }, { status: 401 });
   }
 
-  const { templateKey, to } = await req.json().catch(() => ({ templateKey: null, to: null }));
+  const { templateKey, to } = (await req.json().catch(() => ({ templateKey: null, to: null }))) as {
+    templateKey?: string | null;
+    to?: string | null;
+  };
   if (!templateKey || !to) {
     return Response.json({ error: 'dados_em_falta' }, { status: 400 });
   }

@@ -11,7 +11,10 @@ export default async function handler(req: Request): Promise<Response> {
     return Response.json({ error: 'nao_autorizado' }, { status: 401 });
   }
 
-  const { orderId, templateKey } = await req.json().catch(() => ({ orderId: null, templateKey: null }));
+  const { orderId, templateKey } = (await req.json().catch(() => ({ orderId: null, templateKey: null }))) as {
+    orderId?: string | null;
+    templateKey?: string | null;
+  };
   if (!orderId || !templateKey) {
     return Response.json({ error: 'dados_em_falta' }, { status: 400 });
   }

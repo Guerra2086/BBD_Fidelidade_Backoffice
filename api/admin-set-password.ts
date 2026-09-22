@@ -9,7 +9,7 @@ export default async function handler(req: Request): Promise<Response> {
     return Response.json({ error: 'nao_autorizado' }, { status: 401 });
   }
 
-  const { password } = await req.json().catch(() => ({ password: null }));
+  const { password } = (await req.json().catch(() => ({ password: null }))) as { password?: string | null };
   if (!password || typeof password !== 'string' || password.length < 6) {
     return Response.json({ error: 'password_invalida', message: 'A palavra-passe deve ter pelo menos 6 caracteres.' }, { status: 400 });
   }
