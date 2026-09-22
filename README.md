@@ -21,9 +21,13 @@ As funções em `api/` (`admin-set-password`, `send-test-email`, `send-order-ema
 ## Layout
 
 O visual segue [`referencia/backoffice-segunda-vida.html`](referencia/backoffice-segunda-vida.html) — sidebar fixa
-à esquerda (agrupada por Geral/Catálogo/Análise/Chatbot/Conteúdos/Configuração) em vez do menu horizontal com
-submenus do brief original. CSS portado quase literalmente para `src/styles/` (base, layout, cards, table, modal,
-gallery, feature, responsive).
+à esquerda (agrupada por Geral/Catálogo/Análise/Configuração) em vez do menu horizontal com submenus do brief
+original. CSS portado quase literalmente para `src/styles/` (base, layout, cards, table, modal, gallery, feature,
+responsive).
+
+Chatbot (FAQs/conversas), Colaboradores e Conteúdos (Impacto/Newsletter) do brief original **foram removidos** a
+pedido do Rodrigo — não fazem parte deste layout nem do produto atual. `Administradores` fica fora da referência
+mas mantém-se, por ser a única forma de criar contas de admin (ver secção abaixo).
 
 ## Testes
 
@@ -62,6 +66,9 @@ cola o ficheiro → Run) — não precisas do Supabase CLI para isto:
    `expire_old_orders`.
 3. `supabase/migrations/0003_backoffice_v2_extras.sql` — templates de email em falta + permissão para o botão
    "Simular encomenda" chamar `place_order` a partir de uma sessão de admin.
+4. `supabase/migrations/0004_remove_chatbot_add_smtp_settings.sql` — remove as tabelas do chatbot
+   (`faqs`, `chat_conversations`, `chat_messages`, já sem UI em nenhuma das duas apps) e acrescenta
+   `reply_to_address`/`smtp_config` a `site_settings`, usados pelo ecrã "Remetente dos emails".
 
 `expire_old_orders()` só cancela reservas expiradas quando é chamada — não corre sozinha. Para automatizar,
 configura um **Vercel Cron** (`vercel.json` → `crons`) a chamar uma função `api/` que a invoque com a

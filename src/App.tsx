@@ -11,11 +11,6 @@ import { Movimentos } from './pages/Movimentos';
 import { Categorias } from './pages/Categorias';
 import { Encomendas } from './pages/Encomendas';
 import { Relatorios } from './pages/Relatorios';
-import { Colaboradores } from './pages/Colaboradores';
-import { ChatbotFaqs } from './pages/ChatbotFaqs';
-import { ChatbotConversas } from './pages/ChatbotConversas';
-import { ConteudosImpacto } from './pages/ConteudosImpacto';
-import { ConteudosNewsletter } from './pages/ConteudosNewsletter';
 import { Emails } from './pages/Emails';
 import { Definicoes } from './pages/Definicoes';
 import { Administradores } from './pages/Administradores';
@@ -36,11 +31,6 @@ function Shell() {
         <Route path="/categorias" element={<Categorias />} />
         <Route path="/encomendas" element={<Encomendas />} />
         <Route path="/relatorios" element={<Relatorios />} />
-        <Route path="/colaboradores" element={<Colaboradores />} />
-        <Route path="/chatbot/faqs" element={<ChatbotFaqs />} />
-        <Route path="/chatbot/conversas" element={<ChatbotConversas />} />
-        <Route path="/conteudos/impacto" element={<ConteudosImpacto />} />
-        <Route path="/conteudos/newsletter" element={<ConteudosNewsletter />} />
         <Route path="/emails" element={<Emails />} />
         <Route path="/definicoes" element={<Definicoes />} />
         <Route path="/administradores" element={<Administradores />} />

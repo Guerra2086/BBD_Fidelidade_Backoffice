@@ -26,6 +26,11 @@ export function Definicoes() {
 
   const senderName = getVal(settings, 'sender_name', 'name', 'Banco de Bens Doados');
   const senderAddress = getVal(settings, 'email_sender_address', 'address', 'campanhas.bbd@entrajuda.pt');
+  const replyTo = getVal(settings, 'reply_to_address', 'address', senderAddress);
+  const smtpHost = getVal(settings, 'smtp_config', 'host', 'smtp.resend.com');
+  const smtpPort = getVal(settings, 'smtp_config', 'port', 465);
+  const smtpSecure = getVal(settings, 'smtp_config', 'secure', 'SSL/TLS');
+  const smtpUser = getVal(settings, 'smtp_config', 'user', senderAddress);
   const reserveDays = getVal(settings, 'reserve_days', 'days', 7);
   const lowStock = getVal(settings, 'low_stock_threshold', 'units', 3);
   const alertEmail = getVal(settings, 'alert_email', 'address', '');
@@ -107,8 +112,8 @@ export function Definicoes() {
             <b>{senderAddress}</b>
           </div>
           <div className="kv">
-            <span>Envio via</span>
-            <b className="mono">Resend API</b>
+            <span>Servidor</span>
+            <b className="mono">{smtpHost}:{smtpPort}</b>
           </div>
         </div>
 
@@ -178,7 +183,17 @@ export function Definicoes() {
       </div>
 
       <PasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
-      <SenderModal open={senderOpen} onClose={() => setSenderOpen(false)} senderName={senderName} senderAddress={senderAddress} />
+      <SenderModal
+        open={senderOpen}
+        onClose={() => setSenderOpen(false)}
+        senderName={senderName}
+        senderAddress={senderAddress}
+        replyTo={replyTo}
+        smtpHost={smtpHost}
+        smtpPort={smtpPort}
+        smtpSecure={smtpSecure}
+        smtpUser={smtpUser}
+      />
       <StockSettingsModal
         open={stockOpen}
         onClose={() => setStockOpen(false)}
