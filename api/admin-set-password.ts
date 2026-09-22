@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
-import { supabaseAdmin } from './_shared/supabaseAdmin';
-import { verifyAdmin } from './_shared/adminAuth';
+import { supabaseAdmin } from './_shared/supabaseAdmin.js';
+import { verifyAdmin } from './_shared/adminAuth.js';
 
 // Runtime Node normal (não Edge): bcryptjs usa o módulo `crypto` do Node,
 // que o Edge Runtime do Vercel não suporta.
