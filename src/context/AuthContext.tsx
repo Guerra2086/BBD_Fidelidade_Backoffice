@@ -6,7 +6,7 @@ type AuthState = {
   loading: boolean;
   session: Session | null;
   isAdmin: boolean;
-  signInWithMagicLink: (email: string) => Promise<{ error: string | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -58,8 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
-  async function signInWithMagicLink(email: string) {
-    const { error } = await supabase.auth.signInWithOtp({ email });
+  async function signInWithPassword(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   }
 
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ loading, session, isAdmin, signInWithMagicLink, signOut }}>
+    <AuthContext.Provider value={{ loading, session, isAdmin, signInWithPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );

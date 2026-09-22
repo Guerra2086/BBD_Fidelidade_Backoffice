@@ -14,6 +14,7 @@ import { ChatbotConversas } from './pages/ChatbotConversas';
 import { ConteudosImpacto } from './pages/ConteudosImpacto';
 import { ConteudosNewsletter } from './pages/ConteudosNewsletter';
 import { ConteudosConfiguracoes } from './pages/ConteudosConfiguracoes';
+import { Administradores } from './pages/Administradores';
 
 function Shell() {
   const { session, isAdmin, loading, signOut } = useAuth();
@@ -37,6 +38,7 @@ function Shell() {
         <Route path="/conteudos/impacto" element={<ConteudosImpacto />} />
         <Route path="/conteudos/newsletter" element={<ConteudosNewsletter />} />
         <Route path="/conteudos/configuracoes" element={<ConteudosConfiguracoes />} />
+        <Route path="/administradores" element={<Administradores />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

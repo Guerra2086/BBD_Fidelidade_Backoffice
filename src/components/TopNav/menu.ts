@@ -37,4 +37,5 @@ export const MENU: MenuItem[] = [
       { label: 'Configurações', href: '/conteudos/configuracoes' },
     ],
   },
+  { id: 'administradores', label: 'Administradores', href: '/administradores' },
 ];

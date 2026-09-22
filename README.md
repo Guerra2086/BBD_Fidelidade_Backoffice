@@ -1,7 +1,8 @@
 # Segunda Vida — Backoffice
 
 Painel de gestão da loja solidária "Segunda Vida" (Fidelidade × Banco de Bens Doados). React + Vite + TypeScript,
-autenticação Supabase (magic link, só admins), e dono da migração da base de dados partilhada com o frontoffice.
+autenticação Supabase por email+password (só admins), e dono da migração da base de dados partilhada com o
+frontoffice.
 
 ## Desenvolvimento local
 
@@ -32,9 +33,10 @@ Não há Supabase Edge Functions neste projeto — de propósito. O Supabase ser
 + Storage), acedida a partir de código nosso a correr como **funções serverless do Vercel** (pasta `api/`, uma
 por ficheiro, deploy automático a cada `git push`, sem CLI nem passo extra no Supabase).
 
-- `api/admin-set-password.ts`, `api/send-test-email.ts`, `api/send-order-email.ts`: exigem uma sessão Supabase
-  Auth real de admin (o pedido reencaminha o JWT da sessão; a função confirma `is_admin()` via RPC — ver
-  `api/_shared/adminAuth.ts`) e usam a `service_role` key para escrever (ver `api/_shared/supabaseAdmin.ts`).
+- `api/admin-set-password.ts`, `api/send-test-email.ts`, `api/send-order-email.ts`, `api/admin-create-user.ts`:
+  exigem uma sessão Supabase Auth real de admin (o pedido reencaminha o JWT da sessão; a função confirma
+  `is_admin()` via RPC — ver `api/_shared/adminAuth.ts`) e usam a `service_role` key para escrever (ver
+  `api/_shared/supabaseAdmin.ts`).
 - O resto do backoffice (Produtos, Encomendas, Colaboradores, FAQs, …) fala diretamente com a Supabase a partir do
   browser, autenticado pela sessão do admin — protegido por RLS com `is_admin()`, sem passar por `api/`.
 
@@ -66,8 +68,25 @@ Por isso todas as tabelas da loja (`products`, `categories`, `orders`, …) têm
 repo), que usam a `service_role` key e validam um "gate token" (JWT emitido por `api/gate-login.ts` depois de
 confirmar a palavra-passe). Ver o README do frontoffice.
 
-O backoffice usa Supabase Auth normalmente (magic link) e fala diretamente com a Supabase — RLS com `is_admin()`
-protege as tabelas para esse caso.
+O backoffice usa Supabase Auth normalmente (email+password) e fala diretamente com a Supabase — RLS com
+`is_admin()` protege as tabelas para esse caso.
+
+### Contas de admin: como criar a primeira
+
+Não há signup público — as contas de admin só podem ser criadas por quem já é admin, em **Administradores**
+dentro do backoffice (chama `api/admin-create-user.ts`, que usa a `service_role` key). Isto cria um problema de
+"ovo e galinha" para a primeira conta, que tem de ser criada à mão:
+
+1. Supabase Dashboard → **Authentication → Users → Add user** → mete o email e a palavra-passe do primeiro admin,
+   e marca **"Auto Confirm User"** (para não precisar de confirmar por email).
+2. Supabase Dashboard → **SQL Editor** → corre (troca `<uuid-do-utilizador>` pelo ID que aparece na lista de
+   Users, e os outros valores pelos teus):
+   ```sql
+   insert into profiles (id, nome, email, role)
+   values ('<uuid-do-utilizador>', 'O Teu Nome', 'o.teu@email.pt', 'admin');
+   ```
+3. Entra no backoffice com esse email/password. A partir daí, cria os restantes admins em **Administradores**,
+   sem precisares de voltar a mexer na Supabase diretamente.
 
 ### Password do site por omissão
 
@@ -77,5 +96,4 @@ que possível em **Conteúdos → Configurações**, que chama `api/admin-set-pa
 ## Deploy (Vercel)
 
 Projeto Vite standard — usa `vercel.json` (rewrite SPA) e define `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` +
-`SUPABASE_SERVICE_ROLE_KEY`/`RESEND_API_KEY` nas variáveis de ambiente do projeto Vercel. Depois de publicado,
-atualiza os "Redirect URLs" do Supabase Auth para incluir o domínio Vercel deste backoffice.
+`SUPABASE_SERVICE_ROLE_KEY`/`RESEND_API_KEY` nas variáveis de ambiente do projeto Vercel.
