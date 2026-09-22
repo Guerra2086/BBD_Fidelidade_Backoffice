@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -6,29 +6,19 @@ import { Icon, ProductIcon, ICON_KEYS } from '../lib/icons';
 import { Modal, ConfirmDialog } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 import { eur } from '../lib/orders';
-import type { Category, Product } from '../types';
+import { downloadCsv } from '../lib/csv';
+import { slugify } from '../lib/text';
+import { getOrCreateCategory } from '../lib/categories';
+import { runImagePipeline, regenerateInWorker } from '../lib/imageQueue';
+import { uploadProcessedImage, uploadRegeneratedSquares, deleteProductImageFiles } from '../lib/storageUpload';
+import type { Category, Product, ProductImage, Enquadramento, QualityFlags } from '../types';
 
 const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
-const MAXF = 6;
+const MAXF = 12;
+const NOVA_CATEGORIA = '__nova__';
 
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
-
-function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const csv = '﻿' + rows.map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(';')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function hasQualityWarning(flags: QualityFlags) {
+  return Object.entries(flags).some(([k, v]) => v && k !== 'needs_reprocessing');
 }
 
 function stockLabel(stock: number, low: boolean) {
@@ -49,7 +39,6 @@ type FormState = {
   stock: string;
   destaque_novo: boolean;
   ativo: boolean;
-  fotos: string[];
 };
 
 const EMPTY_FORM: FormState = {
@@ -63,8 +52,9 @@ const EMPTY_FORM: FormState = {
   stock: '1',
   destaque_novo: false,
   ativo: true,
-  fotos: [],
 };
+
+type FotoFiltro = 'revisao' | 'inativos' | 'sem_fotos' | 'sem_preco' | 'avisos';
 
 export function Produtos() {
   const queryClient = useQueryClient();
@@ -72,12 +62,16 @@ export function Produtos() {
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') ?? '');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [fotoFiltro, setFotoFiltro] = useState<FotoFiltro | ''>('');
   const [editing, setEditing] = useState<FormState | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [lightboxFor, setLightboxFor] = useState<{ fotos: string[]; index: number; nome: string } | null>(null);
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
+  const [showNovaCategoria, setShowNovaCategoria] = useState(false);
+  const [cropFor, setCropFor] = useState<ProductImage | null>(null);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -91,14 +85,16 @@ export function Produtos() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('products').select('*').order('nome');
+      const { data, error } = await supabase.from('products').select('*, imagens:product_images(*)').order('nome');
       if (error) throw error;
+      for (const p of data as Product[]) p.imagens?.sort((a, b) => a.posicao - b.posicao);
       return data as Product[];
     },
   });
 
   const categoryNome = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—';
   const categoryLimite = (id: string | null) => categories.find((c) => c.id === id)?.limite_unidades ?? null;
+  const imagensOf = (id?: string) => products.find((p) => p.id === id)?.imagens ?? [];
 
   function openEdit(p?: Product) {
     if (p) {
@@ -107,18 +103,19 @@ export function Produtos() {
         nome: p.nome,
         category_id: p.category_id ?? '',
         descricao: p.descricao ?? '',
-        preco: String(p.preco),
+        preco: p.preco === null ? '' : String(p.preco),
         estado: p.estado,
         icone: p.icone,
         peso_kg: String(p.peso_kg),
         stock: String(p.stock),
         destaque_novo: p.destaque_novo,
         ativo: p.ativo,
-        fotos: [...p.fotos],
       });
     } else {
       setEditing({ ...EMPTY_FORM, category_id: categories[0]?.id ?? '' });
     }
+    setNovaCategoriaNome('');
+    setShowNovaCategoria(false);
   }
 
   useEffect(() => {
@@ -138,8 +135,18 @@ export function Produtos() {
   }, [products]);
 
   const filtered = useMemo(
-    () => products.filter((p) => (!search || p.nome.toLowerCase().includes(search.toLowerCase())) && (!categoryFilter || p.category_id === categoryFilter)),
-    [products, search, categoryFilter],
+    () =>
+      products.filter((p) => {
+        if (search && !p.nome.toLowerCase().includes(search.toLowerCase())) return false;
+        if (categoryFilter && p.category_id !== categoryFilter) return false;
+        if (fotoFiltro === 'revisao' && !p.review_status) return false;
+        if (fotoFiltro === 'inativos' && p.ativo) return false;
+        if (fotoFiltro === 'sem_fotos' && (p.imagens?.length ?? 0) > 0) return false;
+        if (fotoFiltro === 'sem_preco' && p.preco !== null) return false;
+        if (fotoFiltro === 'avisos' && !p.imagens?.some((i) => hasQualityWarning(i.quality_flags))) return false;
+        return true;
+      }),
+    [products, search, categoryFilter, fotoFiltro],
   );
 
   const stockMutation = useMutation({
@@ -183,13 +190,12 @@ export function Produtos() {
         slug: slugify(form.nome) + '-' + Math.random().toString(36).slice(2, 6),
         category_id: form.category_id || null,
         descricao: form.descricao || null,
-        preco: Number(form.preco),
+        preco: form.preco === '' ? null : Number(form.preco),
         estado: form.estado,
         icone: form.icone,
         peso_kg: Number(form.peso_kg) || 0,
         destaque_novo: form.destaque_novo,
         ativo: form.ativo,
-        fotos: form.fotos,
       };
       if (form.id) {
         const { slug: _slug, ...updatePayload } = payload;
@@ -210,68 +216,134 @@ export function Produtos() {
     onError: () => toast('Não foi possível guardar o produto', 'err'),
   });
 
+  async function persistGalleryOrder(imagens: ProductImage[]) {
+    await Promise.all(
+      imagens.map((img, i) => supabase.from('product_images').update({ posicao: i, capa: i === 0 }).eq('id', img.id)),
+    );
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+  }
+
   async function addFiles(files: FileList | File[]) {
-    if (!editing) return;
+    if (!editing?.id) return;
+    const productId = editing.id;
     const list = [...files];
+    const current = imagensOf(productId);
     let skipped = 0;
-    const next = [...editing.fotos];
-    setUploading(true);
+    const accepted: File[] = [];
     for (const f of list) {
       if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
         toast(`${f.name}: formato não suportado`, 'err');
         continue;
       }
-      if (f.size > 5 * 1024 * 1024) {
-        toast(`${f.name}: maior que 5 MB`, 'err');
+      if (f.size > 15 * 1024 * 1024) {
+        toast(`${f.name}: maior que 15 MB`, 'err');
         continue;
       }
-      if (next.length >= MAXF) {
+      if (current.length + accepted.length >= MAXF) {
         skipped++;
         continue;
       }
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${f.name}`;
-      const { error } = await supabase.storage.from('product-images').upload(path, f);
-      if (error) {
-        toast(`Erro ao enviar ${f.name}`, 'err');
-        continue;
-      }
-      next.push(supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl);
+      accepted.push(f);
     }
     if (skipped) toast(`Máximo de ${MAXF} fotografias por produto`, 'err');
+    if (accepted.length === 0) return;
+
+    setUploading(true);
+    let posicao = current.length;
+    await runImagePipeline(
+      accepted.map((f, i) => ({ id: String(i), file: f })),
+      {
+        onItem: async (outcome) => {
+          if (!outcome.result) {
+            toast(`Erro ao processar ${accepted[Number(outcome.id)]?.name ?? 'foto'}`, 'err');
+            return;
+          }
+          const file = accepted[Number(outcome.id)];
+          try {
+            const paths = await uploadProcessedImage(supabase, productId, file.name, outcome.result);
+            const thisPos = posicao++;
+            await supabase.from('product_images').insert({
+              product_id: productId,
+              posicao: thisPos,
+              capa: thisPos === 0,
+              ...paths,
+              quality_flags: outcome.result.quality_flags,
+              enquadramento: outcome.result.enquadramento,
+            });
+          } catch {
+            toast(`Erro ao enviar ${file.name}`, 'err');
+          }
+        },
+      },
+    );
     setUploading(false);
-    setEditing((prev) => (prev ? { ...prev, fotos: next } : prev));
+    queryClient.invalidateQueries({ queryKey: ['products'] });
   }
 
   function moveFoto(k: number, d: number) {
-    setEditing((prev) => {
-      if (!prev) return prev;
-      const fotos = [...prev.fotos];
-      [fotos[k], fotos[k + d]] = [fotos[k + d], fotos[k]];
-      return { ...prev, fotos };
-    });
+    if (!editing?.id) return;
+    const imagens = [...imagensOf(editing.id)];
+    [imagens[k], imagens[k + d]] = [imagens[k + d], imagens[k]];
+    void persistGalleryOrder(imagens);
   }
   function makeCover(k: number) {
-    setEditing((prev) => {
-      if (!prev) return prev;
-      const fotos = [...prev.fotos];
-      fotos.unshift(fotos.splice(k, 1)[0]);
-      return { ...prev, fotos };
-    });
+    if (!editing?.id) return;
+    const imagens = [...imagensOf(editing.id)];
+    imagens.unshift(imagens.splice(k, 1)[0]);
+    void persistGalleryOrder(imagens);
     toast('Nova capa definida');
   }
-  function removeFoto(k: number) {
-    setEditing((prev) => {
-      if (!prev) return prev;
-      const fotos = [...prev.fotos];
-      fotos.splice(k, 1);
-      return { ...prev, fotos };
-    });
+  async function removeFoto(img: ProductImage) {
+    if (!editing?.id) return;
+    await supabase.from('product_images').delete().eq('id', img.id);
+    await deleteProductImageFiles(supabase, [img.original_path, img.large_path, img.medium_path, img.thumb_path]);
+    const remaining = imagensOf(editing.id).filter((i) => i.id !== img.id);
+    await persistGalleryOrder(remaining);
+  }
+  async function reprocessFoto(img: ProductImage) {
+    try {
+      const blob = await (await fetch(img.original_path)).blob();
+      const results = await runImagePipeline([{ id: img.id, file: blob }]);
+      const outcome = results.get(img.id);
+      if (!outcome?.result || !editing?.id) throw new Error(outcome?.error ?? 'falhou');
+      const paths = await uploadProcessedImage(supabase, editing.id, img.id, outcome.result);
+      await supabase
+        .from('product_images')
+        .update({
+          large_path: paths.large_path,
+          medium_path: paths.medium_path,
+          thumb_path: paths.thumb_path,
+          largura: paths.largura,
+          altura: paths.altura,
+          quality_flags: outcome.result.quality_flags,
+          enquadramento: outcome.result.enquadramento,
+        })
+        .eq('id', img.id);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast('Foto reprocessada');
+    } catch {
+      toast('Não foi possível reprocessar esta foto', 'err');
+    }
+  }
+
+  async function handleNovaCategoria() {
+    if (!novaCategoriaNome.trim() || !editing) return;
+    try {
+      const cat = await getOrCreateCategory(supabase, novaCategoriaNome, new Map());
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setEditing({ ...editing, category_id: cat.id });
+      setNovaCategoriaNome('');
+      setShowNovaCategoria(false);
+      toast('Categoria criada');
+    } catch {
+      toast('Não foi possível criar a categoria', 'err');
+    }
   }
 
   async function handleSave() {
     if (!editing) return;
     if (!editing.nome.trim()) return toast('Indica o nome do produto.', 'err');
-    if (editing.preco === '' || +editing.preco < 0) return toast('Preço inválido.', 'err');
+    if (editing.preco !== '' && +editing.preco < 0) return toast('Preço inválido.', 'err');
     if (!editing.id && (editing.stock === '' || +editing.stock < 0 || !Number.isInteger(+editing.stock))) {
       return toast('Stock tem de ser um número inteiro ≥ 0.', 'err');
     }
@@ -293,7 +365,7 @@ export function Produtos() {
             onClick={() =>
               downloadCsv('produtos.csv', [
                 ['Produto', 'Categoria', 'Estado', 'Preço', 'Stock', 'Stock inicial', 'Visível'],
-                ...products.map((p) => [p.nome, categoryNome(p.category_id), p.estado, p.preco, p.stock, p.stock_inicial, p.ativo ? 'Sim' : 'Não']),
+                ...products.map((p) => [p.nome, categoryNome(p.category_id), p.estado, p.preco ?? '', p.stock, p.stock_inicial, p.ativo ? 'Sim' : 'Não']),
               ])
             }
           >
@@ -321,6 +393,17 @@ export function Produtos() {
                 {c.nome}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="field-inline">
+          <Icon name="alert" />
+          <select value={fotoFiltro} onChange={(e) => setFotoFiltro(e.target.value as FotoFiltro | '')}>
+            <option value="">Todos os produtos</option>
+            <option value="revisao">Por rever</option>
+            <option value="inativos">Não publicados</option>
+            <option value="sem_fotos">Sem fotos</option>
+            <option value="sem_preco">Sem preço</option>
+            <option value="avisos">Fotos com avisos</option>
           </select>
         </label>
       </div>
@@ -355,19 +438,22 @@ export function Produtos() {
               filtered.map((p) => {
                 const low = p.stock > 0 && p.stock <= 3;
                 const limite = categoryLimite(p.category_id);
+                const imagens = p.imagens ?? [];
+                const fotosUrls = imagens.map((i) => i.large_path);
+                const avisos = imagens.some((i) => hasQualityWarning(i.quality_flags));
                 return (
                   <tr key={p.id}>
                     <td>
                       <div className="prod">
-                        {p.fotos.length ? (
+                        {imagens.length ? (
                           <div
                             className="thumb photo zoom"
                             style={{ width: 56, height: 56, flex: '0 0 56px' }}
                             title="Ver fotografias"
-                            onClick={() => setLightboxFor({ fotos: p.fotos, index: 0, nome: p.nome })}
+                            onClick={() => setLightboxFor({ fotos: fotosUrls, index: 0, nome: p.nome })}
                           >
-                            <img src={p.fotos[0]} alt={p.nome} />
-                            {p.fotos.length > 1 && <span className="n">{p.fotos.length}</span>}
+                            <img src={imagens[0].thumb_path} alt={p.nome} />
+                            {imagens.length > 1 && <span className="n">{imagens.length}</span>}
                           </div>
                         ) : (
                           <div className="thumb nophoto" style={{ width: 56, height: 56, flex: '0 0 56px' }} title="Sem fotografia">
@@ -377,12 +463,21 @@ export function Produtos() {
                         <div>
                           <b>{p.nome}</b>
                           <small>{p.codigo_passaporte}</small>
-                          {!p.fotos.length && (
+                          {p.review_status && (
                             <>
                               <br />
-                              <span className="no-photo-tag">
+                              <span className="no-photo-tag" title={p.review_status}>
                                 <Icon name="alert" style={{ width: 12, height: 12 }} />
-                                Sem fotografia
+                                Por rever
+                              </span>
+                            </>
+                          )}
+                          {avisos && (
+                            <>
+                              <br />
+                              <span className="no-photo-tag" title="Alguma foto tem avisos de qualidade">
+                                <Icon name="alert" style={{ width: 12, height: 12 }} />
+                                Fotos com avisos
                               </span>
                             </>
                           )}
@@ -411,7 +506,7 @@ export function Produtos() {
                         </>
                       )}
                     </td>
-                    <td className="num">{eur(p.preco)}</td>
+                    <td className="num">{p.preco === null ? '—' : eur(p.preco)}</td>
                     <td>
                       <div className={`stock-cell ${low ? 'low' : ''}`}>
                         <div className="stepper">
@@ -500,19 +595,39 @@ export function Produtos() {
               </div>
               <div className="f">
                 <label>Categoria</label>
-                <select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })}>
+                <select
+                  value={editing.category_id}
+                  onChange={(e) => (e.target.value === NOVA_CATEGORIA ? setShowNovaCategoria(true) : setEditing({ ...editing, category_id: e.target.value }))}
+                >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nome}
                       {c.limite_unidades ? ` (máx. ${c.limite_unidades}/encomenda)` : ''}
                     </option>
                   ))}
+                  <option value={NOVA_CATEGORIA}>+ Nova categoria…</option>
                 </select>
+                {showNovaCategoria && (
+                  <div className="input-suffix" style={{ marginTop: 6 }}>
+                    <input
+                      autoFocus
+                      placeholder="Nome da nova categoria"
+                      value={novaCategoriaNome}
+                      onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNovaCategoria()}
+                    />
+                    <button type="button" className="btn btn-line" onClick={handleNovaCategoria}>
+                      Criar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="cols3">
               <div className="f">
-                <label>Preço solidário</label>
+                <label>
+                  Preço solidário <small>(vazio = por avaliar, não publica)</small>
+                </label>
                 <div className="input-suffix">
                   <input type="number" min={0} step="0.5" value={editing.preco} onChange={(e) => setEditing({ ...editing, preco: e.target.value })} />
                   <span>€</span>
@@ -568,67 +683,89 @@ export function Produtos() {
             </div>
             <div className="f">
               <span className="l">
-                Fotografias <small>· até {MAXF} · JPG, PNG ou WebP até 5 MB · a primeira é a capa na loja</small>
+                Fotografias <small>· até {MAXF} · JPG, PNG ou WebP · a primeira é a capa na loja</small>
               </span>
-              <div className="gallery">
-                {editing.fotos.map((f, k) => (
-                  <div className={`ph-card ${k === 0 ? 'cover' : ''}`} key={f}>
-                    {k === 0 && <span className="cv">Capa</span>}
-                    <img src={f} alt={`Fotografia ${k + 1}`} onClick={() => setLightboxFor({ fotos: editing.fotos, index: k, nome: editing.nome })} />
-                    <div className="tools">
-                      <button type="button" disabled={k === 0} onClick={() => moveFoto(k, -1)} title="Mover para a esquerda">
-                        <Icon name="chev" style={{ width: 15, height: 15 }} />
-                      </button>
-                      {k > 0 && (
-                        <button type="button" onClick={() => makeCover(k)} title="Tornar capa">
-                          ★
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={k === editing.fotos.length - 1}
-                        onClick={() => moveFoto(k, 1)}
-                        title="Mover para a direita"
-                        style={{ transform: 'scaleX(-1)' }}
-                      >
-                        <Icon name="chev" style={{ width: 15, height: 15 }} />
-                      </button>
-                      <button type="button" className="del" onClick={() => removeFoto(k)} title="Remover">
-                        <Icon name="trash" style={{ width: 15, height: 15 }} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {editing.fotos.length < MAXF && (
-                  <label
-                    className={`drop${dragOver ? ' over' : ''}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragOver(false);
-                      addFiles(e.dataTransfer.files);
-                    }}
-                  >
-                    <Icon name="plus" style={{ width: 26, height: 26 }} />
-                    <span>
-                      <b>{uploading ? 'A enviar…' : 'Adicionar fotos'}</b>
-                      arrasta para aqui ou clica
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      multiple
-                      hidden
-                      disabled={uploading}
-                      onChange={(e) => e.target.files && addFiles(e.target.files)}
-                    />
-                  </label>
-                )}
-              </div>
+              {!editing.id ? (
+                <div className="hint">Grava o produto para poderes adicionar fotografias.</div>
+              ) : (
+                <div className="gallery">
+                  {imagensOf(editing.id).map((img, k, arr) => {
+                    const warnings = hasQualityWarning(img.quality_flags);
+                    return (
+                      <div className={`ph-card ${k === 0 ? 'cover' : ''}`} key={img.id}>
+                        {k === 0 && <span className="cv">Capa</span>}
+                        {warnings && (
+                          <span className="cv" style={{ left: 'auto', right: 6, background: 'var(--red)' }} title="Tem avisos de qualidade">
+                            <Icon name="alert" style={{ width: 12, height: 12 }} />
+                          </span>
+                        )}
+                        <img
+                          src={img.medium_path}
+                          alt={`Fotografia ${k + 1}`}
+                          onClick={() => setLightboxFor({ fotos: arr.map((i) => i.large_path), index: k, nome: editing.nome })}
+                        />
+                        <div className="tools">
+                          <button type="button" disabled={k === 0} onClick={() => moveFoto(k, -1)} title="Mover para a esquerda">
+                            <Icon name="chev" style={{ width: 15, height: 15 }} />
+                          </button>
+                          {k > 0 && (
+                            <button type="button" onClick={() => makeCover(k)} title="Tornar capa">
+                              ★
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={k === arr.length - 1}
+                            onClick={() => moveFoto(k, 1)}
+                            title="Mover para a direita"
+                            style={{ transform: 'scaleX(-1)' }}
+                          >
+                            <Icon name="chev" style={{ width: 15, height: 15 }} />
+                          </button>
+                          <button type="button" onClick={() => setCropFor(img)} title="Ajustar enquadramento">
+                            <Icon name="tag" style={{ width: 15, height: 15 }} />
+                          </button>
+                          <button type="button" onClick={() => reprocessFoto(img)} title="Reprocessar">
+                            <Icon name="refresh" style={{ width: 15, height: 15 }} />
+                          </button>
+                          <button type="button" className="del" onClick={() => removeFoto(img)} title="Remover">
+                            <Icon name="trash" style={{ width: 15, height: 15 }} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {imagensOf(editing.id).length < MAXF && (
+                    <label
+                      className={`drop${dragOver ? ' over' : ''}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        addFiles(e.dataTransfer.files);
+                      }}
+                    >
+                      <Icon name="plus" style={{ width: 26, height: 26 }} />
+                      <span>
+                        <b>{uploading ? 'A tratar e a enviar…' : 'Adicionar fotos'}</b>
+                        arrasta para aqui ou clica
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        hidden
+                        disabled={uploading}
+                        onChange={(e) => e.target.files && addFiles(e.target.files)}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
             <div className="f">
               <label>
@@ -684,7 +821,109 @@ export function Produtos() {
       />
 
       {lightboxFor && <Lightbox {...lightboxFor} onClose={() => setLightboxFor(null)} />}
+
+      {cropFor && editing?.id && (
+        <EnquadramentoEditor
+          img={cropFor}
+          onClose={() => setCropFor(null)}
+          onSave={async (box) => {
+            try {
+              const blob = await (await fetch(cropFor.original_path)).blob();
+              const squares = await regenerateInWorker(blob, box);
+              const paths = await uploadRegeneratedSquares(supabase, editing.id!, cropFor.id, squares);
+              await supabase.from('product_images').update({ ...paths, enquadramento: box }).eq('id', cropFor.id);
+              queryClient.invalidateQueries({ queryKey: ['products'] });
+              toast('Enquadramento atualizado');
+            } catch {
+              toast('Não foi possível guardar o novo enquadramento', 'err');
+            }
+            setCropFor(null);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** Editor simples de enquadramento: arrasta para mover, pega no canto para redimensionar. */
+function EnquadramentoEditor({ img, onClose, onSave }: { img: ProductImage; onClose: () => void; onSave: (box: Enquadramento) => void }) {
+  const [box, setBox] = useState<Enquadramento>(img.enquadramento ?? { x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  function onDrag(mode: 'move' | 'resize') {
+    return (e: ReactPointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const start = { ...box };
+      const onMove = (ev: PointerEvent) => {
+        const dx = (ev.clientX - startX) / rect.width;
+        const dy = (ev.clientY - startY) / rect.height;
+        setBox((prev) => {
+          if (mode === 'move') {
+            const x = Math.min(Math.max(0, start.x + dx), 1 - start.w);
+            const y = Math.min(Math.max(0, start.y + dy), 1 - start.h);
+            return { ...prev, x, y };
+          }
+          const w = Math.min(Math.max(0.05, start.w + dx), 1 - start.x);
+          const h = Math.min(Math.max(0.05, start.h + dy), 1 - start.y);
+          return { ...prev, w, h };
+        });
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    };
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Ajustar enquadramento"
+      sub="Arrasta a caixa ou o canto — vai definir o que aparece nos cartões e miniaturas"
+      icon="tag"
+      size="lg"
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="btn btn-red" onClick={() => onSave(box)}>
+            Guardar enquadramento
+          </button>
+        </>
+      }
+    >
+      <div ref={containerRef} style={{ position: 'relative', width: '100%', aspectRatio: '4/3', background: '#111', overflow: 'hidden' }}>
+        <img src={img.large_path} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
+        <div
+          onPointerDown={onDrag('move')}
+          style={{
+            position: 'absolute',
+            left: `${box.x * 100}%`,
+            top: `${box.y * 100}%`,
+            width: `${box.w * 100}%`,
+            height: `${box.h * 100}%`,
+            border: '2px solid var(--red)',
+            cursor: 'move',
+            boxShadow: '0 0 0 2000px rgba(0,0,0,.35)',
+          }}
+        >
+          <div
+            onPointerDown={onDrag('resize')}
+            style={{ position: 'absolute', right: -6, bottom: -6, width: 14, height: 14, background: 'var(--red)', borderRadius: '50%', cursor: 'nwse-resize' }}
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }
 

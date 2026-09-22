@@ -4,6 +4,7 @@ export type Category = {
   slug: string;
   ordem: number;
   limite_unidades: number | null;
+  created_by_import: boolean;
 };
 
 export type Product = {
@@ -12,16 +13,53 @@ export type Product = {
   slug: string;
   category_id: string | null;
   descricao: string | null;
-  preco: number;
+  preco: number | null;
   estado: 'Novo' | 'Como novo' | 'Bom';
   icone: string;
-  fotos: string[];
   peso_kg: number;
   stock: number;
   stock_inicial: number;
   destaque_novo: boolean;
   ativo: boolean;
   codigo_passaporte: string;
+  external_id: string | null;
+  medidas: string | null;
+  formato: string | null;
+  edificios: string | null;
+  grade: string | null;
+  destinos: string[] | null;
+  codigo_slide: string | null;
+  review_status: string | null;
+  created_at: string;
+  updated_at: string;
+  imagens?: ProductImage[];
+};
+
+export type QualityFlags = {
+  baixa_resolucao?: boolean;
+  muito_escura?: boolean;
+  muito_clara?: boolean;
+  desfocada?: boolean;
+  objeto_a_tocar_na_borda?: boolean;
+  duplicada?: boolean;
+  needs_reprocessing?: boolean;
+};
+
+export type Enquadramento = { x: number; y: number; w: number; h: number };
+
+export type ProductImage = {
+  id: string;
+  product_id: string;
+  posicao: number;
+  capa: boolean;
+  original_path: string;
+  large_path: string;
+  medium_path: string;
+  thumb_path: string;
+  largura: number | null;
+  altura: number | null;
+  quality_flags: QualityFlags;
+  enquadramento: Enquadramento | null;
   created_at: string;
   updated_at: string;
 };

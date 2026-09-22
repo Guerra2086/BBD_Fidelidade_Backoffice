@@ -7,6 +7,7 @@ import { Login } from './pages/Login';
 import { SemAcesso } from './pages/SemAcesso';
 import { Dashboard } from './pages/Dashboard';
 import { Produtos } from './pages/Produtos';
+import { Importar } from './pages/Importar';
 import { Movimentos } from './pages/Movimentos';
 import { Categorias } from './pages/Categorias';
 import { Encomendas } from './pages/Encomendas';
@@ -27,6 +28,7 @@ function Shell() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/produtos" element={<Produtos />} />
+        <Route path="/produtos/importar" element={<Importar />} />
         <Route path="/movimentos" element={<Movimentos />} />
         <Route path="/categorias" element={<Categorias />} />
         <Route path="/encomendas" element={<Encomendas />} />

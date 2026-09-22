@@ -16,7 +16,7 @@ export function useAlerts() {
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('products').select('*');
+      const { data, error } = await supabase.from('products').select('*, imagens:product_images(id)');
       if (error) throw error;
       return data as Product[];
     },
@@ -53,7 +53,7 @@ export function useAlerts() {
   const alerts: Alert[] = [];
 
   for (const p of products) {
-    if (!p.fotos?.length) {
+    if (!p.imagens?.length) {
       alerts.push({ tone: 'amber', icon: 'eye', titulo: `${p.nome} sem fotografia`, sub: 'Adiciona fotos antes de o mostrar na loja', href: `/produtos?edit=${p.id}` });
     }
   }
