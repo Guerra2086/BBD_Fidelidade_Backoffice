@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 import { Shell as AppShell } from './components/Shell';
 import { LoginOverlay } from './components/LoginOverlay';
 import { Login } from './pages/Login';
+import { MustChangePassword } from './pages/MustChangePassword';
 import { SemAcesso } from './pages/SemAcesso';
 import { Dashboard } from './pages/Dashboard';
 import { Produtos } from './pages/Produtos';
@@ -17,7 +18,7 @@ import { Definicoes } from './pages/Definicoes';
 import { Administradores } from './pages/Administradores';
 
 function Shell() {
-  const { session, isAdmin, loading } = useAuth();
+  const { session, isAdmin, mustChangePassword, loading } = useAuth();
 
   return (
     <>
@@ -25,6 +26,8 @@ function Shell() {
         <Login />
       ) : !isAdmin ? (
         <SemAcesso />
+      ) : mustChangePassword ? (
+        <MustChangePassword />
       ) : (
         <AppShell>
           <Routes>

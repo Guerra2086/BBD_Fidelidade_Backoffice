@@ -8,8 +8,10 @@ type AuthState = {
   loading: boolean;
   session: Session | null;
   isAdmin: boolean;
+  mustChangePassword: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   loginPhase: LoginPhase;
   loginErrorMsg: string | null;
   resetLoginPhase: () => void;
@@ -25,6 +27,7 @@ const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle');
   const [loginErrorMsg, setLoginErrorMsg] = useState<string | null>(null);
@@ -40,21 +43,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function checkAdmin() {
       if (!session) {
         setIsAdmin(false);
+        setMustChangePassword(false);
         setLoading(false);
         return;
       }
       if (DEV_BYPASS) {
         setIsAdmin(true);
+        setMustChangePassword(false);
         setLoading(false);
         return;
       }
       const { data, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, must_change_password, blocked, banned')
         .eq('id', session.user.id)
         .maybeSingle();
       if (!cancelled) {
-        setIsAdmin(!error && data?.role === 'admin');
+        setIsAdmin(!error && data?.role === 'admin' && !data?.blocked && !data?.banned);
+        setMustChangePassword(!!data?.must_change_password);
         setLoading(false);
       }
     }
@@ -89,9 +95,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginPhase('idle');
   }
 
+  async function updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error: error.message };
+    if (session) {
+      await supabase.from('profiles').update({ must_change_password: false }).eq('id', session.user.id);
+    }
+    setMustChangePassword(false);
+    return { error: null };
+  }
+
   return (
     <AuthContext.Provider
-      value={{ loading, session, isAdmin, signInWithPassword, signOut, loginPhase, loginErrorMsg, resetLoginPhase }}
+      value={{
+        loading,
+        session,
+        isAdmin,
+        mustChangePassword,
+        signInWithPassword,
+        signOut,
+        updatePassword,
+        loginPhase,
+        loginErrorMsg,
+        resetLoginPhase,
+      }}
     >
       {children}
     </AuthContext.Provider>

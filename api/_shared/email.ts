@@ -1,18 +1,9 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
-export type TemplateVars = {
-  nome: string;
-  numero_encomenda: string;
-  itens: string;
-  total: string;
-};
+export type TemplateVars = Record<string, string>;
 
 function renderTemplate(text: string, vars: TemplateVars): string {
-  return text
-    .replaceAll('{{nome}}', vars.nome)
-    .replaceAll('{{numero_encomenda}}', vars.numero_encomenda)
-    .replaceAll('{{itens}}', vars.itens)
-    .replaceAll('{{total}}', vars.total);
+  return Object.entries(vars).reduce((acc, [key, value]) => acc.replaceAll(`{{${key}}}`, value), text);
 }
 
 export function formatItensList(items: { product_nome_snapshot: string; quantidade: number; preco_unitario: number }[]) {

@@ -27,6 +27,8 @@ export const UI: Record<string, string> = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/>',
   chev: '<path d="M15 5l-7 7 7 7"/>',
   upload: '<path d="M12 20V6M6 12l6-6 6 6M4 20h16"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
 };
 
 export function Icon({ name, className = 'i', style }: { name: string; className?: string; style?: React.CSSProperties }) {

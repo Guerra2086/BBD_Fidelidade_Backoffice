@@ -9,7 +9,7 @@ import { callAdminApi } from '../lib/api';
 type EmailTemplate = { key: string; nome: string; assunto: string; corpo_html: string; corpo_texto: string | null; ativo: boolean };
 type SettingRow = { key: string; value: Record<string, unknown> };
 
-const VARS = ['nome', 'numero_encomenda', 'itens', 'total', 'data_limite', 'local_levantamento', 'horario', 'produto', 'stock'];
+const VARS = ['nome', 'numero_encomenda', 'itens', 'total', 'data_limite', 'local_levantamento', 'horario', 'produto', 'stock', 'email', 'password'];
 
 const TPL_META: Record<string, { icon: string; tint: string; col: string; para: string }> = {
   order_confirmation: { icon: 'check', tint: 'var(--green-soft)', col: 'var(--green)', para: 'Colaborador' },
@@ -17,6 +17,8 @@ const TPL_META: Record<string, { icon: string; tint: string; col: string; para: 
   order_cancelled: { icon: 'x', tint: '#EEE', col: '#6B6B6B', para: 'Colaborador' },
   reserve_expiring: { icon: 'clock', tint: 'var(--amber-soft)', col: 'var(--amber)', para: 'Colaborador' },
   low_stock_alert: { icon: 'alert', tint: 'var(--red-soft)', col: 'var(--red)', para: 'Equipa interna' },
+  admin_account_created: { icon: 'lock', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Administrador' },
+  admin_password_reset: { icon: 'lock', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Administrador' },
 };
 
 // Textos de origem das migrações (0001/0003) — usados pelo botão "Repor predefinição".

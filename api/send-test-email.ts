@@ -23,6 +23,8 @@ export default async function handler(req: Request): Promise<Response> {
     numero_encomenda: 'BBD-2026-000000',
     itens: '1x Candeeiro de mesa (12.00 €)',
     total: '12.00 €',
+    email: to,
+    password: 'Ex3mpl0!23',
   });
 
   return Response.json(result, { status: result.sent ? 200 : 500 });

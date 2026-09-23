@@ -40,6 +40,9 @@ tr.click{cursor:pointer}
 .b-exp{background:var(--red-soft);color:var(--red-dark)}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:8px;background:var(--paper-2)}
 .pill.red{background:var(--red-soft);color:var(--red-dark)}
+.pill.green{background:var(--green-soft);color:var(--green)}
+.pill.amber{background:var(--amber-soft);color:var(--amber)}
+.pill.blue{background:var(--blue-soft);color:var(--navy)}
 
 /* stepper + stock */
 .stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
@@ -65,3 +68,7 @@ tr.click{cursor:pointer}
 .row-actions button{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
 .row-actions button:hover{background:var(--paper-2);color:var(--navy)}
 .row-actions button.del:hover{background:var(--red-soft);color:var(--red)}
+.row-actions button.active{background:var(--amber-soft);color:var(--amber)}
+.row-actions button.del.active{background:var(--red-soft);color:var(--red)}
+.row-actions button:disabled{opacity:.35;cursor:not-allowed}
+.row-actions button:disabled:hover{background:none;color:var(--muted)}
