@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '../lib/icons';
 import { useAlerts } from '../hooks/useAlerts';
 import { useToast } from '../context/ToastContext';
+import { useTour } from '../context/TourContext';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 
@@ -12,6 +13,7 @@ export function Topbar({ onBurger }: { onBurger: () => void }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const alerts = useAlerts();
+  const { start: startTour } = useTour();
   const [popOpen, setPopOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -108,6 +110,9 @@ export function Topbar({ onBurger }: { onBurger: () => void }) {
         <button className="btn btn-line" onClick={simularEncomenda} disabled={simulating} title="Simula uma encomenda vinda da loja">
           <Icon name="plus" />
           <span>Simular encomenda</span>
+        </button>
+        <button className="icon-btn" aria-label="Visita guiada" title="Repetir a visita guiada ao backoffice" onClick={startTour}>
+          <Icon name="help" />
         </button>
         <div style={{ position: 'relative' }} ref={popRef}>
           <button className="icon-btn" aria-label="Alertas" onClick={() => setPopOpen((v) => !v)}>

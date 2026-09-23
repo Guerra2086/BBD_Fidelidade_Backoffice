@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { TourProvider } from './context/TourContext';
 import { ToastProvider } from './context/ToastContext';
 import { Shell as AppShell } from './components/Shell';
 import { LoginOverlay } from './components/LoginOverlay';
@@ -57,7 +58,9 @@ function App() {
       <ToastProvider>
         <BrowserRouter>
           <AuthProvider>
-            <Shell />
+            <TourProvider>
+              <Shell />
+            </TourProvider>
           </AuthProvider>
         </BrowserRouter>
       </ToastProvider>

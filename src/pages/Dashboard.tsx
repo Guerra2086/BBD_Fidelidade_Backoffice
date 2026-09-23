@@ -94,7 +94,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid kpis">
+      <div className="grid kpis" data-tour="dash-kpis">
         <div className="card kpi k1">
           <div className="ic">
             <Icon name="euro" />
@@ -157,7 +157,7 @@ export function Dashboard() {
             ))}
           </div>
         </div>
-        <div className="card">
+        <div className="card" data-tour="dash-alertas">
           <div className="card-head">
             <div>
               <h3>Precisa de atenção</h3>
@@ -188,7 +188,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 18, padding: 0 }}>
+      <div className="card" style={{ marginTop: 18, padding: 0 }} data-tour="dash-encomendas">
         <div className="card-head" style={{ padding: '20px 22px 0' }}>
           <div>
             <h3>Últimas encomendas</h3>

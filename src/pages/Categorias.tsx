@@ -78,14 +78,14 @@ export function Categorias() {
           <p>Limite de unidades por encomenda, aplicado na loja e validado no servidor.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-red" onClick={() => openEdit()}>
+          <button className="btn btn-red" data-tour="categoria-nova-btn" onClick={() => openEdit()}>
             <Icon name="plus" />
             Nova categoria
           </button>
         </div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="categoria-tabela">
         <table>
           <thead>
             <tr>

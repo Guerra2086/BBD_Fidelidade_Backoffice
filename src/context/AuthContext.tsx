@@ -9,6 +9,8 @@ type AuthState = {
   session: Session | null;
   isAdmin: boolean;
   mustChangePassword: boolean;
+  tourSeen: boolean;
+  markTourSeen: () => void;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [tourSeen, setTourSeen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle');
   const [loginErrorMsg, setLoginErrorMsg] = useState<string | null>(null);
@@ -44,23 +47,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session) {
         setIsAdmin(false);
         setMustChangePassword(false);
+        setTourSeen(true);
         setLoading(false);
         return;
       }
       if (DEV_BYPASS) {
         setIsAdmin(true);
         setMustChangePassword(false);
+        setTourSeen(true);
         setLoading(false);
         return;
       }
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, must_change_password, blocked, banned')
+        .select('role, must_change_password, blocked, banned, tour_seen')
         .eq('id', session.user.id)
         .maybeSingle();
       if (!cancelled) {
         setIsAdmin(!error && data?.role === 'admin' && !data?.blocked && !data?.banned);
         setMustChangePassword(!!data?.must_change_password);
+        setTourSeen(data?.tour_seen ?? true);
         setLoading(false);
       }
     }
@@ -95,6 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginPhase('idle');
   }
 
+  function markTourSeen() {
+    setTourSeen(true);
+    if (session) {
+      supabase.from('profiles').update({ tour_seen: true }).eq('id', session.user.id);
+    }
+  }
+
   async function updatePassword(newPassword: string) {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { error: error.message };
@@ -112,6 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         isAdmin,
         mustChangePassword,
+        tourSeen,
+        markTourSeen,
         signInWithPassword,
         signOut,
         updatePassword,

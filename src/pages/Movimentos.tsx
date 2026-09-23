@@ -94,7 +94,7 @@ export function Movimentos() {
         </div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="movimentos-tabela">
         <table>
           <thead>
             <tr>

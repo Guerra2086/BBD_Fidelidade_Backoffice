@@ -1,0 +1,217 @@
+export type TourStep = {
+  id: string;
+  /** Rota para onde navegar antes de mostrar este passo (se ainda não lá estivermos). */
+  path?: string;
+  /** Seletor CSS do elemento a realçar. Sem selector = cartão centrado (boas-vindas/fim). */
+  target?: string;
+  title: string;
+  text: string;
+  /** Ao avançar a partir deste passo, clica primeiro no próprio target (ex.: abrir/fechar um modal). */
+  clickToAdvance?: boolean;
+};
+
+export const TOUR_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    path: '/',
+    title: 'Bem-vindo ao backoffice 👋',
+    text: 'Vamos dar uma volta rápida pelo site — sem criar nem alterar nada, só a mostrar onde fica cada coisa. Usa "Seguinte" para avançar ou "Saltar tour" a qualquer momento.',
+  },
+  {
+    id: 'dash-kpis',
+    path: '/',
+    target: '[data-tour="dash-kpis"]',
+    title: 'Resumo da campanha',
+    text: 'Estes cartões mostram a receita recebida, encomendas por levantar, unidades vendidas e alertas de stock baixo, sempre atualizados.',
+  },
+  {
+    id: 'dash-alertas',
+    path: '/',
+    target: '[data-tour="dash-alertas"]',
+    title: 'Precisa de atenção',
+    text: 'Aqui aparecem os avisos que precisam da tua ação — produtos sem fotos, sem preço, stock esgotado, etc. Clicar num alerta leva-te direto a resolvê-lo.',
+  },
+  {
+    id: 'dash-encomendas',
+    path: '/',
+    target: '[data-tour="dash-encomendas"]',
+    title: 'Últimas encomendas',
+    text: 'As encomendas mais recentes da loja, com acesso rápido ao detalhe de cada uma.',
+  },
+  {
+    id: 'nav-produtos',
+    path: '/',
+    target: '[data-tour="nav-produtos"]',
+    title: 'Produtos',
+    text: 'É aqui que se faz a gestão dos produtos em stock — o catálogo todo que aparece na loja para os colaboradores.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'produto-search',
+    path: '/produtos',
+    target: '[data-tour="produto-tabela"]',
+    title: 'Lista de produtos',
+    text: 'Todos os produtos ficam aqui, com pesquisa, filtros por categoria e paginação — para nunca ficar uma tabela gigante.',
+  },
+  {
+    id: 'produto-novo-btn',
+    path: '/produtos',
+    target: '[data-tour="produto-novo-btn"]',
+    title: 'Criar um produto novo',
+    text: 'Vamos abrir o formulário de criação para veres os campos principais — não te preocupes, no fim fechamos sem gravar nada.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'produto-nome',
+    path: '/produtos',
+    target: '[data-tour="produto-nome"]',
+    title: 'Nome do produto',
+    text: 'O nome que os colaboradores veem na loja.',
+  },
+  {
+    id: 'produto-categoria',
+    path: '/produtos',
+    target: '[data-tour="produto-categoria"]',
+    title: 'Categoria',
+    text: 'Escolhes uma categoria existente ou crias uma nova sem sair daqui. Algumas categorias podem ter um limite de unidades por encomenda.',
+  },
+  {
+    id: 'produto-preco',
+    path: '/produtos',
+    target: '[data-tour="produto-preco"]',
+    title: 'Preço solidário',
+    text: 'Se deixares em branco, o produto fica marcado como "por avaliar" e não é publicado até teres um preço definido.',
+  },
+  {
+    id: 'produto-guardar',
+    path: '/produtos',
+    target: '[data-tour="produto-guardar"]',
+    title: 'Guardar',
+    text: 'Depois de preencher tudo (incluindo fotos, já com o produto criado), é aqui que gravas e o produto fica pronto a aparecer na loja.',
+  },
+  {
+    id: 'produto-cancelar',
+    path: '/produtos',
+    target: '[data-tour="produto-cancelar"]',
+    title: 'Sem alterações',
+    text: 'Como isto foi só uma demonstração, vamos fechar sem criar nada.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'nav-categorias',
+    path: '/produtos',
+    target: '[data-tour="nav-categorias"]',
+    title: 'Categorias e limites',
+    text: 'Organiza os produtos em categorias e define limites de unidades por encomenda (ex.: máximo 2 artigos de Tecnologia por colaborador).',
+    clickToAdvance: true,
+  },
+  {
+    id: 'categoria-nova-btn',
+    path: '/categorias',
+    target: '[data-tour="categoria-nova-btn"]',
+    title: 'Nova categoria',
+    text: 'Crias uma categoria nova e, se precisares, defines logo um limite por encomenda.',
+  },
+  {
+    id: 'nav-movimentos',
+    path: '/categorias',
+    target: '[data-tour="nav-movimentos"]',
+    title: 'Movimentos de stock',
+    text: 'O histórico de todas as entradas e saídas de stock — encomendas, ajustes manuais, cancelamentos.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'movimentos-tabela',
+    path: '/movimentos',
+    target: '[data-tour="movimentos-tabela"]',
+    title: 'Histórico de movimentos',
+    text: 'Cada entrada ou saída de stock fica registada aqui, com a razão e quem a fez — útil para perceber o que aconteceu a um produto.',
+  },
+  {
+    id: 'nav-encomendas',
+    path: '/movimentos',
+    target: '[data-tour="nav-encomendas"]',
+    title: 'Encomendas',
+    text: 'Todas as encomendas feitas na loja pelos colaboradores, com o estado de cada uma (pendente, pronta a levantar, entregue, cancelada).',
+    clickToAdvance: true,
+  },
+  {
+    id: 'encomendas-tabela',
+    path: '/encomendas',
+    target: '[data-tour="encomendas-tabela"]',
+    title: 'Gerir uma encomenda',
+    text: 'Clica numa linha para ver o detalhe, mudar o estado ou cancelar. O colaborador recebe sempre um email a acompanhar.',
+  },
+  {
+    id: 'nav-relatorios',
+    path: '/encomendas',
+    target: '[data-tour="nav-relatorios"]',
+    title: 'Relatórios',
+    text: 'Vendas, stock e impacto da campanha — números para acompanhar como está a correr.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'relatorios-periodo',
+    path: '/relatorios',
+    target: '[data-tour="relatorios-periodo"]',
+    title: 'Escolher o período',
+    text: 'Muda a janela de tempo dos relatórios (7, 30 ou 90 dias) para comparares a evolução.',
+  },
+  {
+    id: 'nav-emails',
+    path: '/relatorios',
+    target: '[data-tour="nav-emails"]',
+    title: 'Emails automáticos',
+    text: 'Os emails que o sistema envia sozinho (confirmação de encomenda, pronta a levantar, cancelada, etc.) — podes editar o texto de cada um.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'emails-templates',
+    path: '/emails',
+    target: '[data-tour="emails-templates"]',
+    title: 'Templates de email',
+    text: 'Cada cartão é um email diferente. Podes ligar/desligar, editar o texto e enviar um email de teste antes de guardar.',
+  },
+  {
+    id: 'nav-definicoes',
+    path: '/emails',
+    target: '[data-tour="nav-definicoes"]',
+    title: 'Definições',
+    text: 'A configuração geral da loja: palavra-passe de acesso, remetente dos emails, limites e informação de levantamento.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'definicoes-acesso',
+    path: '/definicoes',
+    target: '[data-tour="definicoes-acesso"]',
+    title: 'Acesso à loja',
+    text: 'A loja pública está protegida por uma palavra-passe única, partilhada com os colaboradores — muda-a aqui quando precisares.',
+  },
+  {
+    id: 'nav-administradores',
+    path: '/definicoes',
+    target: '[data-tour="nav-administradores"]',
+    title: 'Administradores',
+    text: 'Por fim, a gestão de quem tem acesso a este backoffice.',
+    clickToAdvance: true,
+  },
+  {
+    id: 'admins-criar-btn',
+    path: '/administradores',
+    target: '[data-tour="admins-criar-btn"]',
+    title: 'Criar um utilizador',
+    text: 'Basta o nome e o email — a palavra-passe é gerada e enviada automaticamente, e é pedida uma nova no primeiro login.',
+  },
+  {
+    id: 'admins-tabela',
+    path: '/administradores',
+    target: '[data-tour="admins-tabela"]',
+    title: 'Gerir contas',
+    text: 'Por cada conta podes mudar o nome, repor a palavra-passe, bloquear, banir ou eliminar — tudo aqui.',
+  },
+  {
+    id: 'end',
+    title: 'Pronto a começar!',
+    text: 'É só isto — já conheces o essencial do backoffice. Podes repetir esta visita guiada a qualquer momento no botão de ajuda, ao lado do sino de alertas.',
+  },
+];

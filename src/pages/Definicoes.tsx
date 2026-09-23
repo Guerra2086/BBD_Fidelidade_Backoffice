@@ -55,7 +55,7 @@ export function Definicoes() {
       </div>
 
       <div className="set-grid">
-        <div className="card set-card">
+        <div className="card set-card" data-tour="definicoes-acesso">
           <div className="card-head">
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div className="kpi">

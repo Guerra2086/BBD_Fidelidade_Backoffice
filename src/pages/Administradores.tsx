@@ -157,7 +157,7 @@ export function Administradores() {
           <p>Contas com acesso ao backoffice. Todas as contas criadas aqui são administradores.</p>
         </div>
         <div className="actions">
-          <button className="btn btn-red" onClick={openCreate}>
+          <button className="btn btn-red" data-tour="admins-criar-btn" onClick={openCreate}>
             <Icon name="plus" />
             Criar utilizador
           </button>
@@ -171,7 +171,7 @@ export function Administradores() {
         </label>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="admins-tabela">
         <table>
           <thead>
             <tr>

@@ -29,6 +29,7 @@ export const UI: Record<string, string> = {
   upload: '<path d="M12 20V6M6 12l6-6 6 6M4 20h16"/>',
   ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 115.5 1.7c-.8 1.1-2.1 1.4-2.1 3M12 17h.01"/>',
 };
 
 export function Icon({ name, className = 'i', style }: { name: string; className?: string; style?: React.CSSProperties }) {

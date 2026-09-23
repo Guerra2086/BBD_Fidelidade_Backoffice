@@ -56,7 +56,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             return (
               <div key={p.href}>
                 {showLabel && <div className="nav-label">{p.grp}</div>}
-                <Link to={p.href} className={isOn ? 'on' : ''} onClick={onClose}>
+                <Link to={p.href} className={isOn ? 'on' : ''} onClick={onClose} data-tour={`nav-${p.href === '/' ? 'dashboard' : p.href.slice(1)}`}>
                   <Icon name={p.icon} />
                   <span>{p.nome}</span>
                   {!!p.count && <span className="count">{p.count}</span>}

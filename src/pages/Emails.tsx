@@ -157,7 +157,7 @@ export function Emails() {
         </div>
       )}
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(420px,1fr))' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(420px,1fr))' }} data-tour="emails-templates">
         {templates.map((t) => {
           const meta = TPL_META[t.key] ?? { icon: 'mail', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Colaborador' };
           return (

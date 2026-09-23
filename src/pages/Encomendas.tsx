@@ -164,7 +164,7 @@ export function Encomendas() {
         </label>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="encomendas-tabela">
         <table>
           <thead>
             <tr>

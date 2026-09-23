@@ -424,7 +424,7 @@ export function Produtos() {
             <Icon name="upload" />
             Importar
           </button>
-          <button className="btn btn-red" onClick={() => openEdit()}>
+          <button className="btn btn-red" data-tour="produto-novo-btn" onClick={() => openEdit()}>
             <Icon name="plus" />
             Novo produto
           </button>
@@ -460,7 +460,7 @@ export function Produtos() {
         </label>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="produto-tabela">
         <table>
           <thead>
             <tr>
@@ -630,10 +630,10 @@ export function Produtos() {
         }
         footer={
           <>
-            <button className="btn btn-ghost" onClick={() => setEditing(null)}>
+            <button className="btn btn-ghost" data-tour="produto-cancelar" onClick={() => setEditing(null)}>
               Cancelar
             </button>
-            <button className="btn btn-red" disabled={saving} onClick={handleSave}>
+            <button className="btn btn-red" data-tour="produto-guardar" disabled={saving} onClick={handleSave}>
               {saving ? 'A guardar…' : editing?.id ? 'Guardar alterações' : 'Criar produto'}
             </button>
           </>
@@ -642,11 +642,11 @@ export function Produtos() {
         {editing && (
           <div className="form">
             <div className="cols">
-              <div className="f">
+              <div className="f" data-tour="produto-nome">
                 <label>Nome do produto</label>
                 <input value={editing.nome} onChange={(e) => setEditing({ ...editing, nome: e.target.value })} placeholder="Ex.: Cadeira de escritório" />
               </div>
-              <div className="f">
+              <div className="f" data-tour="produto-categoria">
                 <label>Categoria</label>
                 <select
                   value={editing.category_id}
@@ -677,7 +677,7 @@ export function Produtos() {
               </div>
             </div>
             <div className="cols3">
-              <div className="f">
+              <div className="f" data-tour="produto-preco">
                 <label>
                   Preço solidário <small>(vazio = por avaliar, não publica)</small>
                 </label>

@@ -103,7 +103,7 @@ export function Relatorios() {
           <p>Vendas, stock e impacto da campanha.</p>
         </div>
         <div className="actions">
-          <div className="seg">
+          <div className="seg" data-tour="relatorios-periodo">
             {[7, 30, 90].map((d) => (
               <button key={d} className={days === d ? 'on' : ''} onClick={() => setDays(d)}>
                 {d} dias
