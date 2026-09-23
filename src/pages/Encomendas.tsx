@@ -89,7 +89,12 @@ export function Encomendas() {
     if (tab !== 'todas' && o.estado !== tab) return false;
     if (!q) return true;
     const query = q.toLowerCase();
-    return o.codigo.toLowerCase().includes(query) || o.buyer_nome.toLowerCase().includes(query) || o.buyer_email.toLowerCase().includes(query);
+    return (
+      o.codigo.toLowerCase().includes(query) ||
+      o.buyer_nome.toLowerCase().includes(query) ||
+      o.buyer_email.toLowerCase().includes(query) ||
+      (o.buyer_telemovel ?? '').includes(query)
+    );
   });
 
   const cancelMutation = useMutation({
@@ -122,11 +127,12 @@ export function Encomendas() {
             className="btn btn-line"
             onClick={() =>
               downloadCsv('encomendas.csv', [
-                ['N.º', 'Nome', 'Email', 'Data', 'Unidades', 'Total', 'Estado', 'Pagamento'],
+                ['N.º', 'Nome', 'Email', 'Telemóvel', 'Data', 'Unidades', 'Total', 'Estado', 'Pagamento'],
                 ...orders.map((o) => [
                   o.codigo,
                   o.buyer_nome,
                   o.buyer_email,
+                  o.buyer_telemovel ?? '',
                   o.created_at,
                   (itemsByOrder.get(o.id) ?? []).reduce((s, i) => s + i.quantidade, 0),
                   o.total,
@@ -417,6 +423,12 @@ function OrderDetail({
               <span>Email</span>
               <b style={{ wordBreak: 'break-all' }}>{order.buyer_email}</b>
             </div>
+            {order.buyer_telemovel && (
+              <div className="kv">
+                <span>Telemóvel</span>
+                <b>{order.buyer_telemovel}</b>
+              </div>
+            )}
             <div className="note" style={{ marginTop: 8 }}>
               <Icon name="pin" />
               <div>Sem morada · levantamento presencial</div>

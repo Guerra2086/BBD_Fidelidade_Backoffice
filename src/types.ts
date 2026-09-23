@@ -71,6 +71,7 @@ export type Order = {
   codigo: string;
   buyer_nome: string;
   buyer_email: string;
+  buyer_telemovel: string | null;
   total: number;
   peso_total_kg: number;
   estado: OrderEstado;

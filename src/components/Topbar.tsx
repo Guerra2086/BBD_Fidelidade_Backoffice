@@ -63,8 +63,14 @@ export function Topbar({ onBurger }: { onBurger: () => void }) {
       const nomes = ['Ana Ribeiro', 'João Martins', 'Inês Carvalho', 'Pedro Almeida', 'Sofia Lopes'];
       const nome = nomes[Math.floor(Math.random() * nomes.length)];
       const email = nome.toLowerCase().replace(' ', '.') + '@fidelidade.pt';
+      const telemovel = '9' + String(Math.floor(10000000 + Math.random() * 89999999));
       const { data, error } = await supabase
-        .rpc('place_order', { p_buyer_nome: nome, p_buyer_email: email, p_items: [{ product_id: p.id, quantidade: qty }] })
+        .rpc('place_order', {
+          p_buyer_nome: nome,
+          p_buyer_email: email,
+          p_buyer_telemovel: telemovel,
+          p_items: [{ product_id: p.id, quantidade: qty }],
+        })
         .single();
       if (error) throw error;
       const order = data as { codigo: string };
