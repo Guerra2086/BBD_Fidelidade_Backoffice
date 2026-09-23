@@ -2,12 +2,17 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+type LoginPhase = 'idle' | 'checking' | 'success' | 'error';
+
 type AuthState = {
   loading: boolean;
   session: Session | null;
   isAdmin: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  loginPhase: LoginPhase;
+  loginErrorMsg: string | null;
+  resetLoginPhase: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -21,6 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle');
+  const [loginErrorMsg, setLoginErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -59,16 +66,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   async function signInWithPassword(email: string, password: string) {
+    setLoginPhase('checking');
+    setLoginErrorMsg(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoginPhase('error');
+      setLoginErrorMsg('Não foi possível validar as credenciais.');
+    } else {
+      setLoginPhase('success');
+      setTimeout(() => setLoginPhase('idle'), 1500);
+    }
     return { error: error?.message ?? null };
+  }
+
+  function resetLoginPhase() {
+    setLoginPhase('idle');
+    setLoginErrorMsg(null);
   }
 
   async function signOut() {
     await supabase.auth.signOut();
+    setLoginPhase('idle');
   }
 
   return (
-    <AuthContext.Provider value={{ loading, session, isAdmin, signInWithPassword, signOut }}>
+    <AuthContext.Provider
+      value={{ loading, session, isAdmin, signInWithPassword, signOut, loginPhase, loginErrorMsg, resetLoginPhase }}
+    >
       {children}
     </AuthContext.Provider>
   );

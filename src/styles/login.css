@@ -1,0 +1,21 @@
+.login-overlay{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(18,24,38,.4);backdrop-filter:blur(3px);animation:lo-fade .25s ease}
+.login-overlay-card{background:#fff;border-radius:20px;padding:36px 40px;display:flex;flex-direction:column;align-items:center;gap:14px;min-width:240px;box-shadow:0 24px 60px -20px rgba(18,24,38,.45);animation:lo-pop .3s cubic-bezier(.3,1.6,.5,1)}
+.lo-msg{font-size:14px;font-weight:600;color:var(--navy);text-align:center;max-width:240px;margin:0}
+.login-overlay-card.error .lo-msg{color:var(--red-dark)}
+
+.lo-spinner circle:last-child{transform-origin:24px 24px;animation:lo-spin 1s linear infinite}
+
+.lo-circle{stroke-dasharray:151;stroke-dashoffset:151;animation:lo-draw-circle .4s ease forwards}
+.lo-tick{stroke-dasharray:40;stroke-dashoffset:40;animation:lo-draw .3s .35s ease forwards}
+.lo-x1,.lo-x2{stroke-dasharray:24;stroke-dashoffset:24;animation:lo-draw .25s ease forwards}
+.lo-x2{animation-delay:.15s}
+
+@keyframes lo-spin{to{transform:rotate(360deg)}}
+@keyframes lo-draw-circle{to{stroke-dashoffset:0}}
+@keyframes lo-draw{to{stroke-dashoffset:0}}
+@keyframes lo-fade{from{opacity:0}to{opacity:1}}
+@keyframes lo-pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+
+@media (prefers-reduced-motion: reduce){
+  .login-overlay,.login-overlay-card,.lo-spinner circle:last-child,.lo-circle,.lo-tick,.lo-x1,.lo-x2{animation-duration:.01ms!important}
+}
