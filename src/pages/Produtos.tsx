@@ -265,7 +265,7 @@ export function Produtos() {
         const result = await processOneInWorker(file);
         const paths = await uploadProcessedImage(supabase, productId, file.name, result);
         const thisPos = posicao++;
-        await supabase.from('product_images').insert({
+        const { error } = await supabase.from('product_images').insert({
           product_id: productId,
           posicao: thisPos,
           capa: thisPos === 0,
@@ -273,6 +273,7 @@ export function Produtos() {
           quality_flags: result.quality_flags,
           enquadramento: result.enquadramento,
         });
+        if (error) throw error;
       } catch {
         toast(`Erro ao enviar ${file.name}`, 'err');
       }
@@ -296,7 +297,11 @@ export function Produtos() {
   }
   async function removeFoto(img: ProductImage) {
     if (!editing?.id) return;
-    await supabase.from('product_images').delete().eq('id', img.id);
+    const { error } = await supabase.from('product_images').delete().eq('id', img.id);
+    if (error) {
+      toast('Não foi possível remover a foto', 'err');
+      return;
+    }
     await deleteProductImageFiles(supabase, [img.original_path, img.large_path, img.medium_path, img.thumb_path]);
     const remaining = imagensOf(editing.id).filter((i) => i.id !== img.id);
     await persistGalleryOrder(remaining);
@@ -307,7 +312,7 @@ export function Produtos() {
       const blob = await (await fetch(img.original_path)).blob();
       const result = await processOneInWorker(blob);
       const paths = await uploadProcessedImage(supabase, editing.id, img.id, result);
-      await supabase
+      const { error } = await supabase
         .from('product_images')
         .update({
           large_path: paths.large_path,
@@ -319,6 +324,7 @@ export function Produtos() {
           enquadramento: result.enquadramento,
         })
         .eq('id', img.id);
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast('Foto reprocessada');
     } catch {
@@ -339,7 +345,7 @@ export function Produtos() {
         const blob = await (await fetch(img.original_path)).blob();
         const result = await processOneInWorker(blob);
         const paths = await uploadProcessedImage(supabase, img.product_id, img.id, result);
-        await supabase
+        const { error: updError } = await supabase
           .from('product_images')
           .update({
             large_path: paths.large_path,
@@ -351,6 +357,7 @@ export function Produtos() {
             enquadramento: result.enquadramento,
           })
           .eq('id', img.id);
+        if (updError) throw updError;
         ok++;
       } catch {
         /* mantém a foto anterior se o reprocessamento desta falhar, e continua para a seguinte */
@@ -879,7 +886,8 @@ export function Produtos() {
               const blob = await (await fetch(cropFor.original_path)).blob();
               const squares = await regenerateInWorker(blob, box);
               const paths = await uploadRegeneratedSquares(supabase, editing.id!, cropFor.id, squares);
-              await supabase.from('product_images').update({ ...paths, enquadramento: box }).eq('id', cropFor.id);
+              const { error } = await supabase.from('product_images').update({ ...paths, enquadramento: box }).eq('id', cropFor.id);
+              if (error) throw error;
               queryClient.invalidateQueries({ queryKey: ['products'] });
               toast('Enquadramento atualizado');
             } catch {

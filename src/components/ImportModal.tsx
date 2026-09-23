@@ -268,7 +268,8 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             supabase,
             (fullRows ?? []).flatMap((r) => [r.original_path, r.large_path, r.medium_path, r.thumb_path]),
           );
-          await supabase.from('product_images').delete().eq('product_id', productId);
+          const { error: delError } = await supabase.from('product_images').delete().eq('product_id', productId);
+          if (delError) throw delError;
         }
 
         // Coloca as fotos deste produto uma a uma, pela ordem do inventário.
@@ -280,7 +281,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
             try {
               const result = await processOneInWorker(file);
               const paths = await uploadProcessedImage(supabase, productId, filename, result);
-              await supabase.from('product_images').insert({
+              const { error: insertError } = await supabase.from('product_images').insert({
                 product_id: productId,
                 posicao,
                 capa: posicao === 0,
@@ -288,6 +289,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
                 quality_flags: result.quality_flags,
                 enquadramento: result.enquadramento,
               });
+              if (insertError) throw insertError;
               posicao++;
               report.fotosEnviadas++;
               if (hasQualityWarning(result.quality_flags)) report.fotosComAvisos++;
