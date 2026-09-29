@@ -9,15 +9,17 @@ import { eur } from '../lib/orders';
 import { downloadCsv } from '../lib/csv';
 import { slugify } from '../lib/text';
 import { getOrCreateCategory } from '../lib/categories';
+import { getOrCreateTag } from '../lib/tags';
 import { processOneInWorker, regenerateInWorker, terminateImageWorker } from '../lib/imageQueue';
 import { uploadProcessedImage, uploadRegeneratedSquares, deleteProductImageFiles } from '../lib/storageUpload';
 import { Pagination, paginate } from '../components/Pagination';
 import { ImportModal } from '../components/ImportModal';
-import type { Category, Product, ProductImage, Enquadramento, QualityFlags } from '../types';
+import type { Category, Product, ProductImage, Tag, Enquadramento, QualityFlags } from '../types';
 
 const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
 const MAXF = 12;
 const NOVA_CATEGORIA = '__nova__';
+const NOVA_TAG = '__nova_tag__';
 const PAGE_SIZE = 10;
 
 function hasQualityWarning(flags: QualityFlags | null | undefined) {
@@ -35,6 +37,7 @@ type FormState = {
   id?: string;
   nome: string;
   category_id: string;
+  tag_id: string;
   descricao: string;
   preco: string;
   estado: (typeof ESTADOS)[number];
@@ -48,6 +51,7 @@ type FormState = {
 const EMPTY_FORM: FormState = {
   nome: '',
   category_id: '',
+  tag_id: '',
   descricao: '',
   preco: '',
   estado: 'Novo',
@@ -78,6 +82,8 @@ export function Produtos() {
   const [lightboxFor, setLightboxFor] = useState<{ fotos: string[]; index: number; nome: string } | null>(null);
   const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
   const [showNovaCategoria, setShowNovaCategoria] = useState(false);
+  const [novaTagNome, setNovaTagNome] = useState('');
+  const [showNovaTag, setShowNovaTag] = useState(false);
   const [cropFor, setCropFor] = useState<ProductImage | null>(null);
 
   const { data: categories = [] } = useQuery({
@@ -86,6 +92,15 @@ export function Produtos() {
       const { data, error } = await supabase.from('categories').select('*').order('ordem');
       if (error) throw error;
       return data as Category[];
+    },
+  });
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tags').select('*').order('ordem');
+      if (error) throw error;
+      return data as Tag[];
     },
   });
 
@@ -101,6 +116,7 @@ export function Produtos() {
 
   const categoryNome = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—';
   const categoryLimite = (id: string | null) => categories.find((c) => c.id === id)?.limite_unidades ?? null;
+  const tagsOf = (categoryId: string) => tags.filter((t) => t.category_id === categoryId);
   const imagensOf = (id?: string) => products.find((p) => p.id === id)?.imagens ?? [];
 
   function openEdit(p?: Product) {
@@ -109,6 +125,7 @@ export function Produtos() {
         id: p.id,
         nome: p.nome,
         category_id: p.category_id ?? '',
+        tag_id: p.tag_id ?? '',
         descricao: p.descricao ?? '',
         preco: p.preco === null ? '' : String(p.preco),
         estado: p.estado,
@@ -123,6 +140,8 @@ export function Produtos() {
     }
     setNovaCategoriaNome('');
     setShowNovaCategoria(false);
+    setNovaTagNome('');
+    setShowNovaTag(false);
   }
 
   useEffect(() => {
@@ -199,6 +218,7 @@ export function Produtos() {
         nome: form.nome,
         slug: slugify(form.nome) + '-' + Math.random().toString(36).slice(2, 6),
         category_id: form.category_id || null,
+        tag_id: form.tag_id || null,
         descricao: form.descricao || null,
         preco: form.preco === '' ? null : Number(form.preco),
         estado: form.estado,
@@ -375,12 +395,26 @@ export function Produtos() {
     try {
       const cat = await getOrCreateCategory(supabase, novaCategoriaNome, new Map());
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      setEditing({ ...editing, category_id: cat.id });
+      setEditing({ ...editing, category_id: cat.id, tag_id: '' });
       setNovaCategoriaNome('');
       setShowNovaCategoria(false);
       toast('Categoria criada');
     } catch {
       toast('Não foi possível criar a categoria', 'err');
+    }
+  }
+
+  async function handleNovaTag() {
+    if (!novaTagNome.trim() || !editing || !editing.category_id) return;
+    try {
+      const tag = await getOrCreateTag(supabase, editing.category_id, novaTagNome, new Map());
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setEditing({ ...editing, tag_id: tag.id });
+      setNovaTagNome('');
+      setShowNovaTag(false);
+      toast('Etiqueta criada');
+    } catch {
+      toast('Não foi possível criar a etiqueta', 'err');
     }
   }
 
@@ -650,7 +684,11 @@ export function Produtos() {
                 <label>Categoria</label>
                 <select
                   value={editing.category_id}
-                  onChange={(e) => (e.target.value === NOVA_CATEGORIA ? setShowNovaCategoria(true) : setEditing({ ...editing, category_id: e.target.value }))}
+                  onChange={(e) =>
+                    e.target.value === NOVA_CATEGORIA
+                      ? setShowNovaCategoria(true)
+                      : setEditing({ ...editing, category_id: e.target.value, tag_id: '' })
+                  }
                 >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -676,6 +714,39 @@ export function Produtos() {
                 )}
               </div>
             </div>
+            {editing.category_id && (
+              <div className="f" data-tour="produto-tag">
+                <label>
+                  Etiqueta <small>(subdivisão da categoria, opcional)</small>
+                </label>
+                <select
+                  value={editing.tag_id}
+                  onChange={(e) => (e.target.value === NOVA_TAG ? setShowNovaTag(true) : setEditing({ ...editing, tag_id: e.target.value }))}
+                >
+                  <option value="">Sem etiqueta</option>
+                  {tagsOf(editing.category_id).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
+                  <option value={NOVA_TAG}>+ Nova etiqueta…</option>
+                </select>
+                {showNovaTag && (
+                  <div className="input-suffix" style={{ marginTop: 6 }}>
+                    <input
+                      autoFocus
+                      placeholder="Nome da nova etiqueta"
+                      value={novaTagNome}
+                      onChange={(e) => setNovaTagNome(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNovaTag()}
+                    />
+                    <button type="button" className="btn btn-line" onClick={handleNovaTag}>
+                      Criar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="cols3">
               <div className="f" data-tour="produto-preco">
                 <label>

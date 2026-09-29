@@ -4,12 +4,17 @@ import { supabase } from '../lib/supabase';
 import { Icon } from '../lib/icons';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
-import type { Category, Product } from '../types';
+import { slugify } from '../lib/text';
+import type { Category, Product, Tag } from '../types';
 
 export function Categorias() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [editing, setEditing] = useState<{ id?: string; nome: string; limitOn: boolean; limite: string } | null>(null);
+  const [managingTagsFor, setManagingTagsFor] = useState<Category | null>(null);
+  const [novaTagNome, setNovaTagNome] = useState('');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagNome, setEditingTagNome] = useState('');
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -17,6 +22,15 @@ export function Categorias() {
       const { data, error } = await supabase.from('categories').select('*').order('ordem');
       if (error) throw error;
       return data as Category[];
+    },
+  });
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tags').select('*').order('ordem');
+      if (error) throw error;
+      return data as Tag[];
     },
   });
 
@@ -39,6 +53,49 @@ export function Categorias() {
     }
     return map;
   }, [products]);
+
+  const tagsByCategory = (categoryId: string) => tags.filter((t) => t.category_id === categoryId);
+
+  const tagSaveMutation = useMutation({
+    mutationFn: async ({ categoryId, nome }: { categoryId: string; nome: string }) => {
+      const { error } = await supabase
+        .from('tags')
+        .insert({ category_id: categoryId, nome, slug: slugify(nome), ordem: tagsByCategory(categoryId).length + 1 });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setNovaTagNome('');
+      toast('Etiqueta criada', 'ok');
+    },
+    onError: () => toast('Não foi possível criar a etiqueta (nome já existe nesta categoria?)', 'err'),
+  });
+
+  const tagRenameMutation = useMutation({
+    mutationFn: async ({ id, nome }: { id: string; nome: string }) => {
+      const { error } = await supabase.from('tags').update({ nome, slug: slugify(nome) }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setEditingTagId(null);
+      toast('Etiqueta atualizada', 'ok');
+    },
+    onError: () => toast('Não foi possível atualizar a etiqueta', 'err'),
+  });
+
+  const tagDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('tags').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast('Etiqueta apagada');
+    },
+    onError: () => toast('Não foi possível apagar a etiqueta', 'err'),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (form: NonNullable<typeof editing>) => {
@@ -93,12 +150,14 @@ export function Categorias() {
               <th>Produtos</th>
               <th>Unidades em stock</th>
               <th>Limite por encomenda</th>
+              <th>Etiquetas</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {categories.map((c) => {
               const s = stats.get(c.id) ?? { count: 0, stock: 0 };
+              const catTags = tagsByCategory(c.id);
               return (
                 <tr key={c.id}>
                   <td>
@@ -112,6 +171,12 @@ export function Categorias() {
                     ) : (
                       <span style={{ color: 'var(--muted)' }}>Sem limite</span>
                     )}
+                  </td>
+                  <td>
+                    <button className="btn btn-line" onClick={() => setManagingTagsFor(c)}>
+                      <Icon name="tag" />
+                      {catTags.length ? `${catTags.length} etiqueta(s)` : 'Gerir etiquetas'}
+                    </button>
                   </td>
                   <td>
                     <div className="row-actions">
@@ -162,6 +227,78 @@ export function Categorias() {
                 <input type="number" min={1} value={editing.limite} onChange={(e) => setEditing({ ...editing, limite: e.target.value })} />
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!managingTagsFor}
+        onClose={() => setManagingTagsFor(null)}
+        title={managingTagsFor ? `Etiquetas de "${managingTagsFor.nome}"` : ''}
+        sub="Subdivisões da categoria, usadas como filtro na loja"
+        icon="tag"
+        footer={
+          <button className="btn btn-ghost" onClick={() => setManagingTagsFor(null)}>
+            Fechar
+          </button>
+        }
+      >
+        {managingTagsFor && (
+          <div className="form">
+            <ul className="simple-list">
+              {tagsByCategory(managingTagsFor.id).map((t) => (
+                <li key={t.id}>
+                  {editingTagId === t.id ? (
+                    <div className="input-suffix">
+                      <input
+                        autoFocus
+                        value={editingTagNome}
+                        onChange={(e) => setEditingTagNome(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && editingTagNome.trim() && tagRenameMutation.mutate({ id: t.id, nome: editingTagNome.trim() })}
+                      />
+                      <button type="button" className="btn btn-line" onClick={() => editingTagNome.trim() && tagRenameMutation.mutate({ id: t.id, nome: editingTagNome.trim() })}>
+                        Guardar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span>{t.nome}</span>
+                      <div className="row-actions">
+                        <button
+                          title="Renomear"
+                          onClick={() => {
+                            setEditingTagId(t.id);
+                            setEditingTagNome(t.nome);
+                          }}
+                        >
+                          <Icon name="edit" />
+                        </button>
+                        <button title="Apagar" onClick={() => tagDeleteMutation.mutate(t.id)}>
+                          <Icon name="trash" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </li>
+              ))}
+              {!tagsByCategory(managingTagsFor.id).length && <li style={{ color: 'var(--muted)' }}>Ainda sem etiquetas nesta categoria.</li>}
+            </ul>
+            <div className="input-suffix" style={{ marginTop: 10 }}>
+              <input
+                placeholder="Nome da nova etiqueta"
+                value={novaTagNome}
+                onChange={(e) => setNovaTagNome(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && novaTagNome.trim() && tagSaveMutation.mutate({ categoryId: managingTagsFor.id, nome: novaTagNome.trim() })}
+              />
+              <button
+                type="button"
+                className="btn btn-line"
+                onClick={() => novaTagNome.trim() && tagSaveMutation.mutate({ categoryId: managingTagsFor.id, nome: novaTagNome.trim() })}
+              >
+                <Icon name="plus" />
+                Adicionar
+              </button>
+            </div>
           </div>
         )}
       </Modal>

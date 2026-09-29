@@ -46,3 +46,6 @@
 .seg button.on{background:var(--navy);color:#fff}
 .meter{height:6px;border-radius:3px;background:var(--paper-2);margin-top:8px;overflow:hidden}
 .meter i{display:block;height:100%;width:0;transition:width .3s,background .3s}
+.simple-list{display:grid;gap:6px;max-height:280px;overflow:auto}
+.simple-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#fff;border:1.5px solid var(--line);border-radius:12px;font-size:14px}
+.simple-list li .input-suffix{flex:1}

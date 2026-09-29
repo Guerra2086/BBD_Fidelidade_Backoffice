@@ -7,11 +7,20 @@ export type Category = {
   created_by_import: boolean;
 };
 
+export type Tag = {
+  id: string;
+  category_id: string;
+  nome: string;
+  slug: string;
+  ordem: number;
+};
+
 export type Product = {
   id: string;
   nome: string;
   slug: string;
   category_id: string | null;
+  tag_id: string | null;
   descricao: string | null;
   preco: number | null;
   estado: 'Novo' | 'Como novo' | 'Bom';
