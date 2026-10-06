@@ -85,6 +85,8 @@ export type Order = {
   peso_total_kg: number;
   estado: OrderEstado;
   payment_method: 'Numerário' | 'Multibanco' | 'MB WAY' | null;
+  recolha_data: string | null; // YYYY-MM-DD
+  recolha_turno: 'manha' | 'tarde' | null;
   created_at: string;
   updated_at: string;
 };

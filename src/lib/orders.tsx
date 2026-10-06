@@ -42,3 +42,13 @@ export function daysLeft(order: Order, reserveDays: number) {
   today.setHours(12, 0, 0, 0);
   return Math.ceil((orderDeadline(order, reserveDays).getTime() - today.getTime()) / 86400000);
 }
+
+// Turno de recolha escolhido no frontoffice. "curto" → "21/10 · Manhã"; senão → "quarta-feira, 21 de outubro · Manhã".
+export function fmtRecolha(o: Pick<Order, 'recolha_data' | 'recolha_turno'>, curto = false) {
+  if (!o.recolha_data || !o.recolha_turno) return null;
+  const d = new Date(`${o.recolha_data}T12:00:00Z`);
+  const opts: Intl.DateTimeFormatOptions = curto
+    ? { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
+    : { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
+  return `${new Intl.DateTimeFormat('pt-PT', opts).format(d)} · ${o.recolha_turno === 'manha' ? 'Manhã' : 'Tarde'}`;
+}

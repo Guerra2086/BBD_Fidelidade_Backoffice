@@ -6,7 +6,7 @@ import { Icon, ProductIcon } from '../lib/icons';
 import { Modal, ConfirmDialog } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 import { callAdminApi } from '../lib/api';
-import { eur, fmtDT, OrderBadge, ESTADO_LABEL, daysLeft, orderDeadline } from '../lib/orders';
+import { eur, fmtDT, fmtRecolha, OrderBadge, ESTADO_LABEL, daysLeft, orderDeadline } from '../lib/orders';
 import type { Order, OrderEvent, OrderItem, Product } from '../types';
 
 const TABS: [string, string][] = [
@@ -127,13 +127,14 @@ export function Encomendas() {
             className="btn btn-line"
             onClick={() =>
               downloadCsv('encomendas.csv', [
-                ['N.º', 'Nome', 'Email', 'Telemóvel', 'Data', 'Unidades', 'Total', 'Estado', 'Pagamento'],
+                ['N.º', 'Nome', 'Email', 'Telemóvel', 'Data', 'Recolha', 'Unidades', 'Total', 'Estado', 'Pagamento'],
                 ...orders.map((o) => [
                   o.codigo,
                   o.buyer_nome,
                   o.buyer_email,
                   o.buyer_telemovel ?? '',
                   o.created_at,
+                  fmtRecolha(o) ?? '',
                   (itemsByOrder.get(o.id) ?? []).reduce((s, i) => s + i.quantidade, 0),
                   o.total,
                   o.estado,
@@ -171,6 +172,7 @@ export function Encomendas() {
               <th>N.º</th>
               <th>Colaborador</th>
               <th>Data</th>
+              <th>Recolha</th>
               <th>Artigos</th>
               <th>Total a pagar</th>
               <th>Estado</th>
@@ -181,13 +183,13 @@ export function Encomendas() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <div className="empty">A carregar…</div>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <div className="empty">Sem encomendas neste filtro.</div>
                 </td>
               </tr>
@@ -204,6 +206,7 @@ export function Encomendas() {
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>{o.buyer_email}</div>
                     </td>
                     <td>{fmtDT(o.created_at)}</td>
+                    <td>{fmtRecolha(o, true) ?? '—'}</td>
                     <td>{units} un.</td>
                     <td className="num">{eur(o.total)}</td>
                     <td>
@@ -427,6 +430,12 @@ function OrderDetail({
               <div className="kv">
                 <span>Telemóvel</span>
                 <b>{order.buyer_telemovel}</b>
+              </div>
+            )}
+            {fmtRecolha(order) && (
+              <div className="kv">
+                <span>Recolha</span>
+                <b>{fmtRecolha(order)}</b>
               </div>
             )}
             <div className="note" style={{ marginTop: 8 }}>
