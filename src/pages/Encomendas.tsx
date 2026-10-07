@@ -93,7 +93,8 @@ export function Encomendas() {
       o.codigo.toLowerCase().includes(query) ||
       o.buyer_nome.toLowerCase().includes(query) ||
       o.buyer_email.toLowerCase().includes(query) ||
-      (o.buyer_telemovel ?? '').includes(query)
+      (o.buyer_telemovel ?? '').includes(query) ||
+      (o.buyer_nif ?? '').includes(query)
     );
   });
 
@@ -127,12 +128,13 @@ export function Encomendas() {
             className="btn btn-line"
             onClick={() =>
               downloadCsv('encomendas.csv', [
-                ['N.º', 'Nome', 'Email', 'Telemóvel', 'Data', 'Recolha', 'Unidades', 'Total', 'Estado', 'Pagamento'],
+                ['N.º', 'Nome', 'Email', 'Telemóvel', 'NIF', 'Data', 'Recolha', 'Unidades', 'Total', 'Estado', 'Pagamento'],
                 ...orders.map((o) => [
                   o.codigo,
                   o.buyer_nome,
                   o.buyer_email,
                   o.buyer_telemovel ?? '',
+                  o.buyer_nif ?? '',
                   o.created_at,
                   fmtRecolha(o) ?? '',
                   (itemsByOrder.get(o.id) ?? []).reduce((s, i) => s + i.quantidade, 0),
@@ -430,6 +432,18 @@ function OrderDetail({
               <div className="kv">
                 <span>Telemóvel</span>
                 <b>{order.buyer_telemovel}</b>
+              </div>
+            )}
+            {order.buyer_nif && (
+              <div className="kv">
+                <span>NIF</span>
+                <b>{order.buyer_nif}</b>
+              </div>
+            )}
+            {order.termos_aceites_em && (
+              <div className="kv">
+                <span>Termos aceites</span>
+                <b>{fmtDT(order.termos_aceites_em)}</b>
               </div>
             )}
             {fmtRecolha(order) && (

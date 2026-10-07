@@ -81,6 +81,8 @@ export type Order = {
   buyer_nome: string;
   buyer_email: string;
   buyer_telemovel: string | null;
+  buyer_nif: string | null;
+  termos_aceites_em: string | null;
   total: number;
   peso_total_kg: number;
   estado: OrderEstado;

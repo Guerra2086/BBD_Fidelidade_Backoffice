@@ -16,6 +16,8 @@ import { Pagination, paginate } from '../components/Pagination';
 import { ImportModal } from '../components/ImportModal';
 import type { Category, Product, ProductImage, Tag, Enquadramento, QualityFlags } from '../types';
 
+// O estado (grade) deixou de ser usado na loja e já não se edita aqui; a coluna continua na
+// base de dados (obrigatória), por isso os produtos novos ficam com um valor por omissão.
 const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
 const MAXF = 12;
 const NOVA_CATEGORIA = '__nova__';
@@ -442,8 +444,8 @@ export function Produtos() {
             className="btn btn-line"
             onClick={() =>
               downloadCsv('produtos.csv', [
-                ['Produto', 'Categoria', 'Estado', 'Preço', 'Stock', 'Stock inicial', 'Visível'],
-                ...products.map((p) => [p.nome, categoryNome(p.category_id), p.estado, p.preco ?? '', p.stock, p.stock_inicial, p.ativo ? 'Sim' : 'Não']),
+                ['Produto', 'Categoria', 'Preço', 'Stock', 'Stock inicial', 'Visível'],
+                ...products.map((p) => [p.nome, categoryNome(p.category_id), p.preco ?? '', p.stock, p.stock_inicial, p.ativo ? 'Sim' : 'Não']),
               ])
             }
           >
@@ -500,7 +502,7 @@ export function Produtos() {
             <tr>
               <th>Produto</th>
               <th>Categoria</th>
-              <th>Estado</th>
+              <th>Destaque</th>
               <th>Preço</th>
               <th>Stock</th>
               <th>Visível na loja</th>
@@ -582,14 +584,12 @@ export function Produtos() {
                       ) : null}
                     </td>
                     <td>
-                      <span className="pill">{p.estado}</span>
-                      {p.destaque_novo && (
-                        <>
-                          {' '}
-                          <span className="pill" style={{ background: 'var(--red)', color: '#fff' }}>
-                            Novo
-                          </span>
-                        </>
+                      {p.destaque_novo ? (
+                        <span className="pill" style={{ background: 'var(--red)', color: '#fff' }}>
+                          Novo
+                        </span>
+                      ) : (
+                        '—'
                       )}
                     </td>
                     <td className="num">{p.preco === null ? '—' : eur(p.preco)}</td>
@@ -756,14 +756,6 @@ export function Produtos() {
                   <input type="number" min={0} step="0.5" value={editing.preco} onChange={(e) => setEditing({ ...editing, preco: e.target.value })} />
                   <span>€</span>
                 </div>
-              </div>
-              <div className="f">
-                <label>Estado</label>
-                <select value={editing.estado} onChange={(e) => setEditing({ ...editing, estado: e.target.value as FormState['estado'] })}>
-                  {ESTADOS.map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
               </div>
               <div className="f">
                 <label>
