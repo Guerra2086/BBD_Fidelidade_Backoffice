@@ -76,7 +76,7 @@ function send(req: RequestWithoutId): Promise<WorkerResponse> {
       settled = true;
       cleanup();
       replaceWorker(worker);
-      reject(new Error('tempo_esgotado_a_processar_imagem'));
+      reject(new Error('Demorou demasiado tempo a processar (foto presa)'));
     }, WORKER_TIMEOUT_MS);
 
     worker.addEventListener('message', onMessage);

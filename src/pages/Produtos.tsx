@@ -37,6 +37,8 @@ function hasQualityWarning(flags: QualityFlags | null | undefined) {
   return Object.entries(flags).some(([k, v]) => v && k !== 'needs_reprocessing');
 }
 
+type ReprocessFail = { id: string; nome: string; error: string };
+
 function stockLabel(stock: number, low: boolean) {
   if (stock === 0) return 'Esgotado';
   if (low) return 'Stock baixo';
@@ -86,6 +88,7 @@ export function Produtos() {
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState<{ done: number; total: number } | null>(null);
+  const [reprocessResult, setReprocessResult] = useState<{ ok: number; failed: ReprocessFail[] } | null>(null);
   const [editing, setEditing] = useState<FormState | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -370,15 +373,19 @@ export function Produtos() {
   // centenas/milhares de fotos, uma de cada vez seria demasiado lento.
   const REPROCESS_CONCURRENCY = 4;
 
-  async function reprocessAll() {
-    const { data: images, error } = await supabase.from('product_images').select('*').returns<ProductImage[]>();
+  async function reprocessAll(onlyIds?: string[]) {
+    let query = supabase.from('product_images').select('*');
+    if (onlyIds) query = query.in('id', onlyIds);
+    const { data: images, error } = await query.returns<ProductImage[]>();
     if (error || !images) {
       toast('Não foi possível carregar as fotos existentes', 'err');
       return;
     }
     const list = images;
+    setReprocessResult(null);
     setReprocessing({ done: 0, total: list.length });
     let ok = 0;
+    const failed: ReprocessFail[] = [];
     let nextIndex = 0;
 
     async function worker() {
@@ -402,10 +409,15 @@ export function Produtos() {
             .eq('id', img.id);
           if (updError) throw updError;
           ok++;
-        } catch {
-          /* mantém a foto anterior se o reprocessamento desta falhar (ex.: ficheiro
-             corrompido, ou demorou demasiado e o worker foi substituído), e continua
-             para a seguinte */
+        } catch (e) {
+          // Mantém a foto anterior se o reprocessamento desta falhar (ex.: ficheiro
+          // corrompido, ou demorou demasiado e o worker foi substituído) — guarda o
+          // motivo para se poder ver e tentar só estas de novo.
+          failed.push({
+            id: img.id,
+            nome: products.find((p) => p.id === img.product_id)?.nome ?? img.product_id,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
         setReprocessing((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev));
       }
@@ -414,6 +426,7 @@ export function Produtos() {
     await Promise.all(Array.from({ length: REPROCESS_CONCURRENCY }, worker));
     terminateImageWorker();
     setReprocessing(null);
+    setReprocessResult({ ok, failed });
     queryClient.invalidateQueries({ queryKey: ['products'] });
     toast('Reprocessamento concluído', 'ok', `${ok} de ${list.length} fotos`);
   }
@@ -478,7 +491,7 @@ export function Produtos() {
             <Icon name="down" />
             Exportar CSV
           </button>
-          <button className="btn btn-line" onClick={reprocessAll} disabled={!!reprocessing}>
+          <button className="btn btn-line" onClick={() => reprocessAll()} disabled={!!reprocessing}>
             <Icon name="refresh" />
             {reprocessing ? `A reprocessar… ${reprocessing.done}/${reprocessing.total}` : 'Reprocessar todas as imagens'}
           </button>
@@ -492,6 +505,44 @@ export function Produtos() {
           </button>
         </div>
       </div>
+
+      {reprocessResult && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-head">
+            <div>
+              <h3>Resultado do reprocessamento</h3>
+              <p>
+                {reprocessResult.ok} fotos corrigidas
+                {reprocessResult.failed.length > 0 && ` · ${reprocessResult.failed.length} falharam`}
+              </p>
+            </div>
+            <div className="actions">
+              {reprocessResult.failed.length > 0 && (
+                <button className="btn btn-line" disabled={!!reprocessing} onClick={() => reprocessAll(reprocessResult.failed.map((f) => f.id))}>
+                  <Icon name="refresh" />
+                  Tentar novamente só as que falharam
+                </button>
+              )}
+              <button className="btn btn-line" onClick={() => setReprocessResult(null)}>
+                <Icon name="x" />
+                Fechar
+              </button>
+            </div>
+          </div>
+          {reprocessResult.failed.length > 0 && (
+            <details>
+              <summary>Ver fotos que falharam ({reprocessResult.failed.length})</summary>
+              <ul>
+                {reprocessResult.failed.map((f) => (
+                  <li key={f.id}>
+                    {f.nome} — {f.error}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       <div className="toolbar">
         <label className="field-inline" style={{ flex: 1, minWidth: 220, maxWidth: 360 }}>
