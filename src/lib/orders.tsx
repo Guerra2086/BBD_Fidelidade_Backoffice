@@ -43,6 +43,15 @@ export function daysLeft(order: Order, reserveDays: number) {
   return Math.ceil((orderDeadline(order, reserveDays).getTime() - today.getTime()) / 86400000);
 }
 
+// Nos dias úteis há um único período de recolha (o dia todo, 11h–20h), por isso não faz
+// sentido chamar-lhe "manhã"; só aos fins de semana é que há de facto manhã/tarde — tem de
+// bater certo com a mesma regra em Frontoffice/src/lib/pickup.ts (turnoLabel).
+function turnoLabel(data: string, turno: 'manha' | 'tarde') {
+  const dow = new Date(`${data}T12:00:00Z`).getUTCDay();
+  if (dow !== 0 && dow !== 6) return 'Dia todo';
+  return turno === 'manha' ? 'Manhã' : 'Tarde';
+}
+
 // Turno de recolha escolhido no frontoffice. "curto" → "21/10 · Manhã"; senão → "quarta-feira, 21 de outubro · Manhã".
 export function fmtRecolha(o: Pick<Order, 'recolha_data' | 'recolha_turno'>, curto = false) {
   if (!o.recolha_data || !o.recolha_turno) return null;
@@ -50,5 +59,5 @@ export function fmtRecolha(o: Pick<Order, 'recolha_data' | 'recolha_turno'>, cur
   const opts: Intl.DateTimeFormatOptions = curto
     ? { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
     : { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
-  return `${new Intl.DateTimeFormat('pt-PT', opts).format(d)} · ${o.recolha_turno === 'manha' ? 'Manhã' : 'Tarde'}`;
+  return `${new Intl.DateTimeFormat('pt-PT', opts).format(d)} · ${turnoLabel(o.recolha_data, o.recolha_turno)}`;
 }
