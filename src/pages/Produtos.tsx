@@ -16,9 +16,17 @@ import { Pagination, paginate } from '../components/Pagination';
 import { ImportModal } from '../components/ImportModal';
 import type { Category, Product, ProductImage, Tag, Enquadramento, QualityFlags } from '../types';
 
-// O estado (grade) deixou de ser usado na loja e já não se edita aqui; a coluna continua na
-// base de dados (obrigatória), por isso os produtos novos ficam com um valor por omissão.
+// A loja mostra a "Grade" (A/B/C) do artigo em vez do estado por extenso — mesma
+// correspondência usada na importação (GRADE_TO_ESTADO, em lib/importParse.ts).
 const ESTADOS = ['Novo', 'Como novo', 'Bom'] as const;
+const GRADE_OPTIONS: { grade: 'A' | 'B' | 'C'; estado: (typeof ESTADOS)[number] }[] = [
+  { grade: 'A', estado: 'Novo' },
+  { grade: 'B', estado: 'Como novo' },
+  { grade: 'C', estado: 'Bom' },
+];
+function gradeFor(estado: (typeof ESTADOS)[number]): 'A' | 'B' | 'C' {
+  return GRADE_OPTIONS.find((g) => g.estado === estado)?.grade ?? 'C';
+}
 const MAXF = 12;
 const NOVA_CATEGORIA = '__nova__';
 const NOVA_TAG = '__nova_tag__';
@@ -41,6 +49,7 @@ type FormState = {
   category_id: string;
   tag_id: string;
   descricao: string;
+  medidas: string;
   preco: string;
   estado: (typeof ESTADOS)[number];
   icone: string;
@@ -55,6 +64,7 @@ const EMPTY_FORM: FormState = {
   category_id: '',
   tag_id: '',
   descricao: '',
+  medidas: '',
   preco: '',
   estado: 'Novo',
   icone: ICON_KEYS[0],
@@ -129,6 +139,7 @@ export function Produtos() {
         category_id: p.category_id ?? '',
         tag_id: p.tag_id ?? '',
         descricao: p.descricao ?? '',
+        medidas: p.medidas ?? '',
         preco: p.preco === null ? '' : String(p.preco),
         estado: p.estado,
         icone: p.icone,
@@ -222,6 +233,7 @@ export function Produtos() {
         category_id: form.category_id || null,
         tag_id: form.tag_id || null,
         descricao: form.descricao || null,
+        medidas: form.medidas || null,
         preco: form.preco === '' ? null : Number(form.preco),
         estado: form.estado,
         icone: form.icone,
@@ -766,6 +778,35 @@ export function Produtos() {
                   <span>kg</span>
                 </div>
               </div>
+              <div className="f">
+                <label>
+                  Grade <small>(aparece na loja)</small>
+                </label>
+                <select
+                  value={gradeFor(editing.estado)}
+                  onChange={(e) => {
+                    const estado = GRADE_OPTIONS.find((g) => g.grade === e.target.value)?.estado ?? 'Bom';
+                    setEditing({ ...editing, estado });
+                  }}
+                >
+                  {GRADE_OPTIONS.map((g) => (
+                    <option key={g.grade} value={g.grade}>
+                      Grade {g.grade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="f">
+              <label>
+                Medidas <small>(alt × comp × larg, opcional)</small>
+              </label>
+              <input
+                type="text"
+                placeholder="ex.: 75 × 120 × 60 cm"
+                value={editing.medidas}
+                onChange={(e) => setEditing({ ...editing, medidas: e.target.value })}
+              />
             </div>
             <div className="cols">
               {!editing.id ? (

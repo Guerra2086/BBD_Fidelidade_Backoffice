@@ -256,37 +256,16 @@ function renderLarge(source: OffscreenCanvas, srcW: number, srcH: number, maxSid
   return canvas;
 }
 
-function supportsCanvasFilter(ctx: OffscreenCanvasRenderingContext2D) {
-  return 'filter' in ctx;
-}
-
 /**
  * Gera uma versão quadrada com o objeto sempre inteiro dentro (letterbox). O
- * espaço à volta é preenchido com a cor de fundo estimada ou, se o fundo não for
- * uniforme, uma cópia desfocada da própria foto (quando o browser suportar
- * `ctx.filter`; caso contrário cai para a cor de fundo estimada).
+ * espaço à volta é preenchido com a cor de fundo estimada (média dos cantos da
+ * foto original) — sem desfoque, mesmo quando o fundo não é uniforme.
  */
-function renderSquare(
-  source: OffscreenCanvas,
-  srcRect: { x: number; y: number; w: number; h: number },
-  size: number,
-  bg: RGB,
-  bgUniform: boolean,
-) {
+function renderSquare(source: OffscreenCanvas, srcRect: { x: number; y: number; w: number; h: number }, size: number, bg: RGB) {
   const { canvas, ctx } = makeCanvas(size, size);
 
-  if (bgUniform || !supportsCanvasFilter(ctx)) {
-    ctx.fillStyle = `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`;
-    ctx.fillRect(0, 0, size, size);
-  } else {
-    ctx.save();
-    ctx.filter = 'blur(18px)';
-    const scale = Math.max(size / srcRect.w, size / srcRect.h) * 1.15;
-    const dw = srcRect.w * scale;
-    const dh = srcRect.h * scale;
-    ctx.drawImage(source, srcRect.x, srcRect.y, srcRect.w, srcRect.h, (size - dw) / 2, (size - dh) / 2, dw, dh);
-    ctx.restore();
-  }
+  ctx.fillStyle = `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`;
+  ctx.fillRect(0, 0, size, size);
 
   const avail = size * (1 - MARGIN * 2);
   const scale = Math.min(avail / srcRect.w, avail / srcRect.h);
@@ -368,8 +347,8 @@ export async function processImage(file: File | Blob): Promise<ProcessedImage> {
   trimmedCtx.drawImage(fullCanvas, trimmed.x, trimmed.y, trimmed.w, trimmed.h, 0, 0, trimmed.w, trimmed.h);
   const largeCanvas = renderLarge(trimmedCanvas, trimmed.w, trimmed.h, LARGE_MAX);
 
-  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color, bg.uniform);
-  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color, bg.uniform);
+  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color);
+  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color);
 
   const [largeBlob, mediumBlob, thumbBlob] = await Promise.all([
     canvasToBlob(largeCanvas),
@@ -400,8 +379,8 @@ export async function regenerateSquares(file: File | Blob, box: Enquadramento): 
   const { fullCanvas, bg, trimmed } = await prepareCanvas(file);
   const srcRect = boxToSrcRect(trimmed, box, false);
 
-  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color, bg.uniform);
-  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color, bg.uniform);
+  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color);
+  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color);
   const [mediumBlob, thumbBlob] = await Promise.all([canvasToBlob(mediumCanvas), canvasToBlob(thumbCanvas)]);
 
   return {
