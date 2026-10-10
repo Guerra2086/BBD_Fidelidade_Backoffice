@@ -9,7 +9,6 @@ import type { Enquadramento, QualityFlags } from '../types';
 export const LARGE_MAX = 1600;
 export const MEDIUM_SIZE = 800;
 export const THUMB_SIZE = 300;
-const MARGIN = 0.06;
 const ZOOM_THRESHOLD = 0.5; // objeto a ocupar menos disto da caixa -> aplica zoom
 const BORDER_UNIFORM_TOLERANCE = 12; // diferença de cor (0-255) para considerar uma linha "lisa"
 const BG_DISTANCE_THRESHOLD = 28; // diferença de cor para considerar um pixel "objeto"
@@ -257,18 +256,15 @@ function renderLarge(source: OffscreenCanvas, srcW: number, srcH: number, maxSid
 }
 
 /**
- * Gera uma versão quadrada com o objeto sempre inteiro dentro (letterbox). O
- * espaço à volta é preenchido com a cor de fundo estimada (média dos cantos da
- * foto original) — sem desfoque, mesmo quando o fundo não é uniforme.
+ * Gera uma versão quadrada que preenche o quadrado todo (crop central, sem
+ * nenhuma margem nem cor de fundo à volta) — o oposto de um letterbox: em vez
+ * de encolher a foto para caber inteira, amplia-a o necessário para cobrir o
+ * quadrado, cortando o que sobrar dos lados mais compridos.
  */
-function renderSquare(source: OffscreenCanvas, srcRect: { x: number; y: number; w: number; h: number }, size: number, bg: RGB) {
+function renderSquare(source: OffscreenCanvas, srcRect: { x: number; y: number; w: number; h: number }, size: number) {
   const { canvas, ctx } = makeCanvas(size, size);
 
-  ctx.fillStyle = `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`;
-  ctx.fillRect(0, 0, size, size);
-
-  const avail = size * (1 - MARGIN * 2);
-  const scale = Math.min(avail / srcRect.w, avail / srcRect.h);
+  const scale = Math.max(size / srcRect.w, size / srcRect.h);
   const dw = srcRect.w * scale;
   const dh = srcRect.h * scale;
   ctx.drawImage(source, srcRect.x, srcRect.y, srcRect.w, srcRect.h, (size - dw) / 2, (size - dh) / 2, dw, dh);
@@ -347,8 +343,8 @@ export async function processImage(file: File | Blob): Promise<ProcessedImage> {
   trimmedCtx.drawImage(fullCanvas, trimmed.x, trimmed.y, trimmed.w, trimmed.h, 0, 0, trimmed.w, trimmed.h);
   const largeCanvas = renderLarge(trimmedCanvas, trimmed.w, trimmed.h, LARGE_MAX);
 
-  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color);
-  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color);
+  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE);
+  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE);
 
   const [largeBlob, mediumBlob, thumbBlob] = await Promise.all([
     canvasToBlob(largeCanvas),
@@ -376,11 +372,11 @@ export async function processImage(file: File | Blob): Promise<ProcessedImage> {
  * enquadramento de uma foto já importada.
  */
 export async function regenerateSquares(file: File | Blob, box: Enquadramento): Promise<{ medium: ImageVariant; thumb: ImageVariant }> {
-  const { fullCanvas, bg, trimmed } = await prepareCanvas(file);
+  const { fullCanvas, trimmed } = await prepareCanvas(file);
   const srcRect = boxToSrcRect(trimmed, box, false);
 
-  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE, bg.color);
-  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE, bg.color);
+  const mediumCanvas = renderSquare(fullCanvas, srcRect, MEDIUM_SIZE);
+  const thumbCanvas = renderSquare(fullCanvas, srcRect, THUMB_SIZE);
   const [mediumBlob, thumbBlob] = await Promise.all([canvasToBlob(mediumCanvas), canvasToBlob(thumbCanvas)]);
 
   return {
