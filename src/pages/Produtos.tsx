@@ -366,42 +366,56 @@ export function Produtos() {
     }
   }
 
+  // Processa várias fotos ao mesmo tempo (ver POOL_SIZE em imageQueue.ts) — com
+  // centenas/milhares de fotos, uma de cada vez seria demasiado lento.
+  const REPROCESS_CONCURRENCY = 4;
+
   async function reprocessAll() {
     const { data: images, error } = await supabase.from('product_images').select('*').returns<ProductImage[]>();
     if (error || !images) {
       toast('Não foi possível carregar as fotos existentes', 'err');
       return;
     }
-    setReprocessing({ done: 0, total: images.length });
+    const list = images;
+    setReprocessing({ done: 0, total: list.length });
     let ok = 0;
-    for (const img of images) {
-      try {
-        const blob = await (await fetch(img.original_path)).blob();
-        const result = await processOneInWorker(blob);
-        const paths = await uploadProcessedImage(supabase, img.product_id, img.id, result);
-        const { error: updError } = await supabase
-          .from('product_images')
-          .update({
-            large_path: paths.large_path,
-            medium_path: paths.medium_path,
-            thumb_path: paths.thumb_path,
-            largura: paths.largura,
-            altura: paths.altura,
-            quality_flags: result.quality_flags,
-            enquadramento: result.enquadramento,
-          })
-          .eq('id', img.id);
-        if (updError) throw updError;
-        ok++;
-      } catch {
-        /* mantém a foto anterior se o reprocessamento desta falhar, e continua para a seguinte */
+    let nextIndex = 0;
+
+    async function worker() {
+      while (nextIndex < list.length) {
+        const img = list[nextIndex++];
+        try {
+          const blob = await (await fetch(img.original_path)).blob();
+          const result = await processOneInWorker(blob);
+          const paths = await uploadProcessedImage(supabase, img.product_id, img.id, result);
+          const { error: updError } = await supabase
+            .from('product_images')
+            .update({
+              large_path: paths.large_path,
+              medium_path: paths.medium_path,
+              thumb_path: paths.thumb_path,
+              largura: paths.largura,
+              altura: paths.altura,
+              quality_flags: result.quality_flags,
+              enquadramento: result.enquadramento,
+            })
+            .eq('id', img.id);
+          if (updError) throw updError;
+          ok++;
+        } catch {
+          /* mantém a foto anterior se o reprocessamento desta falhar (ex.: ficheiro
+             corrompido, ou demorou demasiado e o worker foi substituído), e continua
+             para a seguinte */
+        }
+        setReprocessing((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev));
       }
-      setReprocessing((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev));
     }
+
+    await Promise.all(Array.from({ length: REPROCESS_CONCURRENCY }, worker));
     terminateImageWorker();
     setReprocessing(null);
     queryClient.invalidateQueries({ queryKey: ['products'] });
-    toast('Reprocessamento concluído', 'ok', `${ok} de ${images.length} fotos`);
+    toast('Reprocessamento concluído', 'ok', `${ok} de ${list.length} fotos`);
   }
 
   async function handleNovaCategoria() {
