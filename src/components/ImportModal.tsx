@@ -214,6 +214,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           grade: p.row.grade,
           destinos: p.row.destinos,
           codigo_slide: p.row.codigo_slide,
+          codigo_categoria: p.row.codigoCategoria,
           review_status: p.reviewStatus,
           ativo,
         };

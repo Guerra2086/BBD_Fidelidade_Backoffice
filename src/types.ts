@@ -31,6 +31,7 @@ export type Product = {
   destaque_novo: boolean;
   ativo: boolean;
   codigo_passaporte: string;
+  codigo_categoria: string | null;
   external_id: string | null;
   medidas: string | null;
   limite_compra: number | null;

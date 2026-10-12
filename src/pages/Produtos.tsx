@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { eur } from '../lib/orders';
 import { downloadCsv } from '../lib/csv';
 import { slugify } from '../lib/text';
-import { getOrCreateCategory } from '../lib/categories';
+import { getOrCreateCategory, proximoCodigoCategoria } from '../lib/categories';
 import { getOrCreateTag } from '../lib/tags';
 import { processOneInWorker, regenerateInWorker, terminateImageWorker } from '../lib/imageQueue';
 import { uploadProcessedImage, uploadRegeneratedSquares, deleteProductImageFiles } from '../lib/storageUpload';
@@ -255,7 +255,10 @@ export function Produtos() {
       } else {
         const stock = Number(form.stock) || 0;
         const codigo_passaporte = `BBD-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`;
-        const { error } = await supabase.from('products').insert({ ...payload, stock, stock_inicial: stock, codigo_passaporte });
+        const categoriaNome = categories.find((c) => c.id === form.category_id)?.nome ?? '';
+        const codigosExistentes = products.map((p) => p.codigo_categoria).filter((c): c is string => !!c);
+        const codigo_categoria = categoriaNome ? proximoCodigoCategoria(categoriaNome, codigosExistentes) : null;
+        const { error } = await supabase.from('products').insert({ ...payload, stock, stock_inicial: stock, codigo_passaporte, codigo_categoria });
         if (error) throw error;
       }
     },
@@ -631,7 +634,7 @@ export function Produtos() {
                         )}
                         <div>
                           <b>{p.nome}</b>
-                          <small>{p.codigo_passaporte}</small>
+                          <small>{p.codigo_categoria ? `${p.codigo_categoria} · ` : ''}{p.codigo_passaporte}</small>
                           {p.review_status && (
                             <>
                               <br />
@@ -901,6 +904,12 @@ export function Produtos() {
                 <div className="f">
                   <span className="l">Código</span>
                   <input value={products.find((p) => p.id === editing.id)?.codigo_passaporte ?? ''} disabled style={{ background: 'var(--paper-2)' }} />
+                </div>
+              )}
+              {editing.id && (
+                <div className="f">
+                  <span className="l">Código de categoria</span>
+                  <input value={products.find((p) => p.id === editing.id)?.codigo_categoria ?? ''} disabled style={{ background: 'var(--paper-2)' }} />
                 </div>
               )}
               <div className="f">

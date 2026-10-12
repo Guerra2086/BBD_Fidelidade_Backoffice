@@ -43,3 +43,24 @@ export async function getOrCreateCategory(
   cache.set(slug, created as Category);
   return created as Category;
 }
+
+function categoriaLetra(nome: string): string {
+  const limpo = nome.normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const letra = limpo.charAt(0).toUpperCase();
+  return /[A-Z]/.test(letra) ? letra : 'X';
+}
+
+/**
+ * Código sequencial por categoria (1ª letra do nome + contagem), ex.: cadeiras -> C1, C2, ...,
+ * mesas -> M1, M2, ... `codigosExistentes` deve conter os `codigo_categoria` já atribuídos
+ * (de qualquer categoria); esta função olha só para os que começam pela letra desta categoria.
+ */
+export function proximoCodigoCategoria(nomeCategoria: string, codigosExistentes: Iterable<string>): string {
+  const letra = categoriaLetra(nomeCategoria);
+  let max = 0;
+  for (const codigo of codigosExistentes) {
+    const m = /^([A-Z])(\d+)$/.exec(codigo);
+    if (m && m[1] === letra) max = Math.max(max, Number(m[2]));
+  }
+  return `${letra}${max + 1}`;
+}
