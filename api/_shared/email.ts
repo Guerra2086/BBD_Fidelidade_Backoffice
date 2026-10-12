@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin';
+import { sendGraphMail } from './graphMail';
 
 export type TemplateVars = Record<string, string>;
 
@@ -26,28 +27,13 @@ export async function sendTemplatedEmail(templateKey: string, to: string, vars: 
   const { data: settingRow } = await admin.from('site_settings').select('value').eq('key', 'email_sender_address').maybeSingle();
   const sender = (settingRow?.value as { address?: string } | null)?.address || 'campanhas.bbd@entrajuda.pt';
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    console.error('RESEND_API_KEY não configurado — email não enviado.');
-    return { sent: false, reason: 'resend_nao_configurado' };
-  }
-
   const subject = renderTemplate(template.assunto, vars);
   const html = renderTemplate(template.corpo_html, vars);
-  const text = template.corpo_texto ? renderTemplate(template.corpo_texto, vars) : undefined;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from: sender, to: [to], subject, html, text }),
-  });
-
-  if (!res.ok) {
-    console.error('Falha ao enviar email via Resend:', await res.text());
-    return { sent: false, reason: 'resend_erro' };
+  const result = await sendGraphMail({ from: sender, to, subject, html });
+  if (!result.ok) {
+    console.error('Falha ao enviar email via Microsoft Graph:', result.error);
+    return { sent: false, reason: 'graph_erro' };
   }
   return { sent: true };
 }
