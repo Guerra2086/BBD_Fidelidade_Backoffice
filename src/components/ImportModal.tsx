@@ -55,6 +55,26 @@ const QUALITY_LABELS: Record<keyof QualityFlags, string> = {
   needs_reprocessing: 'por reprocessar',
 };
 
+// Erros do Supabase (PostgrestError) não são instâncias de Error, por isso `instanceof
+// Error` falha e `String(e)` dava só "[object Object]" — vai antes buscar .message (e
+// .details/.hint, quando existam, que costumam ter a causa real, ex. a constraint que falhou).
+function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object') {
+    const obj = e as Record<string, unknown>;
+    if (typeof obj.message === 'string') {
+      const extra = [obj.details, obj.hint].filter((x) => typeof x === 'string' && x).join(' — ');
+      return extra ? `${obj.message} (${extra})` : obj.message;
+    }
+    try {
+      return JSON.stringify(e);
+    } catch {
+      /* ignora */
+    }
+  }
+  return String(e);
+}
+
 function hasQualityWarning(flags: QualityFlags | null | undefined) {
   if (!flags) return false;
   return (Object.keys(QUALITY_LABELS) as (keyof QualityFlags)[]).some((k) => flags[k]);
@@ -164,7 +184,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       setPreviewPage(1);
       setPhase('preview');
     } catch (e) {
-      toast(`Erro a ler ${next.dataFile.name}: ${e instanceof Error ? e.message : String(e)}`, 'err');
+      toast(`Erro a ler ${next.dataFile.name}: ${errMsg(e)}`, 'err');
     }
   }
 
@@ -322,14 +342,14 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               report.fotosEnviadas++;
               if (hasQualityWarning(result.quality_flags)) report.fotosComAvisos++;
             } catch (e) {
-              report.erros.push(`${filename}: ${e instanceof Error ? e.message : String(e)}`);
+              report.erros.push(`${filename}: ${errMsg(e)}`);
             }
           }
           done++;
           setProgress({ done, total: totalFotos });
         }
       } catch (e) {
-        report.erros.push(`${p.row.external_id} (${p.row.nome}): ${e instanceof Error ? e.message : String(e)}`);
+        report.erros.push(`${p.row.external_id} (${p.row.nome}): ${errMsg(e)}`);
       }
     }
 
