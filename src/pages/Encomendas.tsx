@@ -38,6 +38,7 @@ export function Encomendas() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [reviewId, setReviewId] = useState<string | null>(null);
   const [reserveDays, setReserveDays] = useState(7);
 
   const { data: orders = [], isLoading } = useQuery({
@@ -242,8 +243,14 @@ export function Encomendas() {
             setPayingId(openId);
             setOpenId(null);
           }}
+          onReview={() => {
+            setReviewId(openId);
+            setOpenId(null);
+          }}
         />
       )}
+
+      {reviewId && <ReviewConfirmModal orderId={reviewId} onClose={() => setReviewId(null)} onBack={() => { setOpenId(reviewId); setReviewId(null); }} />}
 
       <ConfirmDialog
         open={!!cancelId}
@@ -273,16 +280,15 @@ function OrderDetail({
   onClose,
   onCancel,
   onPay,
+  onReview,
 }: {
   orderId: string;
   reserveDays: number;
   onClose: () => void;
   onCancel: () => void;
   onPay: () => void;
+  onReview: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-
   const { data: order } = useQuery({
     queryKey: ['order', orderId],
     queryFn: async () => {
@@ -316,21 +322,6 @@ function OrderDetail({
     },
   });
 
-  const readyMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('mark_order_ready', { p_order_id: orderId });
-      if (error) throw error;
-      await callAdminApi('send-order-email', { orderId, templateKey: 'order_ready' }).catch(() => {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-      queryClient.invalidateQueries({ queryKey: ['order_events', orderId] });
-      toast('Marcada como pronta para levantamento');
-    },
-    onError: () => toast('Não foi possível atualizar a encomenda', 'err'),
-  });
-
   if (!order) return null;
 
   const active = ['pendente', 'pronta_levantamento'].includes(order.estado);
@@ -353,9 +344,9 @@ function OrderDetail({
             <button className="btn btn-ghost" onClick={onClose}>
               Fechar
             </button>
-            <button className="btn btn-navy" onClick={() => readyMutation.mutate()}>
+            <button className="btn btn-navy" onClick={onReview}>
               <Icon name="box" />
-              Marcar como pronta
+              Rever e confirmar
             </button>
           </>
         ) : order.estado === 'pronta_levantamento' ? (
@@ -499,6 +490,7 @@ function PaymentModal({ orderId, onClose, onBack }: { orderId: string; onClose: 
     mutationFn: async () => {
       const { error } = await supabase.rpc('register_order_payment', { p_order_id: orderId, p_metodo: method });
       if (error) throw error;
+      await callAdminApi('send-order-email', { orderId, templateKey: 'order_delivered' }).catch(() => {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -558,6 +550,138 @@ function PaymentModal({ orderId, onClose, onBack }: { orderId: string; onClose: 
           <button type="button" className={`toggle ${confirmed ? 'on' : ''}`} onClick={() => setConfirmed((v) => !v)}></button>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+// Revê e confirma um pedido "pendente": por omissão mantém todas as quantidades (equivale
+// à antiga "marcar como pronta", envia order_ready); se o admin reduzir alguma quantidade
+// por falta de stock, confirma só essa parte (confirm_order_partial, envia order_partial —
+// ou order_cancelled se ficar tudo a 0, porque aí o RPC cancela o pedido).
+function ReviewConfirmModal({ orderId, onClose, onBack }: { orderId: string; onClose: () => void; onBack: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const { data: order } = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
+      if (error) throw error;
+      return data as Order;
+    },
+  });
+  const { data: items = [] } = useQuery({
+    queryKey: ['order_items', orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('order_items').select('*').eq('order_id', orderId);
+      if (error) throw error;
+      return data as OrderItem[];
+    },
+  });
+
+  const [qtys, setQtys] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    if (items.length && !qtys) {
+      setQtys(Object.fromEntries(items.map((i) => [i.id, i.quantidade])));
+    }
+  }, [items, qtys]);
+
+  const confirmMutation = useMutation({
+    mutationFn: async () => {
+      if (!qtys) return;
+      const changed = items.some((i) => (qtys[i.id] ?? 0) !== i.quantidade);
+
+      if (!changed) {
+        const { error } = await supabase.rpc('mark_order_ready', { p_order_id: orderId });
+        if (error) throw error;
+        await callAdminApi('send-order-email', { orderId, templateKey: 'order_ready' }).catch(() => {});
+        return;
+      }
+
+      const novoTotal = items.reduce((s, i) => s + (qtys[i.id] ?? 0) * i.preco_unitario, 0);
+      const { error } = await supabase.rpc('confirm_order_partial', {
+        p_order_id: orderId,
+        p_items: items.map((i) => ({ item_id: i.id, quantidade: qtys[i.id] ?? 0 })),
+      });
+      if (error) throw error;
+      await callAdminApi('send-order-email', { orderId, templateKey: novoTotal > 0 ? 'order_partial' : 'order_cancelled' }).catch(() => {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['order_items', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['order_events', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
+      toast('Pedido confirmado');
+      onClose();
+    },
+    onError: () => toast('Não foi possível confirmar o pedido', 'err'),
+  });
+
+  if (!order || !qtys) return null;
+
+  const novoTotal = items.reduce((s, i) => s + (qtys[i.id] ?? 0) * i.preco_unitario, 0);
+  const changed = items.some((i) => (qtys[i.id] ?? 0) !== i.quantidade);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Rever e confirmar pedido"
+      sub={`${order.codigo} · ${order.buyer_nome}`}
+      icon="box"
+      size="lg"
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onBack}>
+            Voltar
+          </button>
+          <button className="btn btn-navy" disabled={confirmMutation.isPending} onClick={() => confirmMutation.mutate()}>
+            <Icon name="check" />
+            {changed ? 'Confirmar com alterações' : 'Confirmar tudo'}
+          </button>
+        </>
+      }
+    >
+      <p className="hint" style={{ marginBottom: 10 }}>
+        Ajusta a quantidade de um artigo se não houver stock suficiente para o entregar. O stock dos artigos reduzidos ou removidos é reposto
+        automaticamente e o colaborador recebe um email com o que foi confirmado.
+      </p>
+      <div className="items-list">
+        {items.map((i) => (
+          <div className="it" key={i.id}>
+            <div className="t">
+              <b>{i.product_nome_snapshot}</b>
+              <small>
+                {eur(i.preco_unitario)} / unidade · pedido: {i.quantidade}
+              </small>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={i.quantidade}
+              value={qtys[i.id] ?? 0}
+              style={{ width: 70 }}
+              onChange={(e) => {
+                const v = Math.max(0, Math.min(i.quantidade, Number(e.target.value) || 0));
+                setQtys({ ...qtys, [i.id]: v });
+              }}
+            />
+            <b className="num">{eur((qtys[i.id] ?? 0) * i.preco_unitario)}</b>
+          </div>
+        ))}
+      </div>
+      <div className="kv" style={{ borderTop: '2px solid var(--ink)', marginTop: 10, paddingTop: 12, fontSize: 16 }}>
+        <b>Novo total a pagar</b>
+        <b className="num">{eur(novoTotal)}</b>
+      </div>
+      {novoTotal === 0 && (
+        <div className="note red" style={{ marginTop: 10 }}>
+          <Icon name="alert" />
+          <div>Nenhum artigo ficou confirmado — ao continuar, o pedido é cancelado automaticamente.</div>
+        </div>
+      )}
     </Modal>
   );
 }

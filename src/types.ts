@@ -91,6 +91,7 @@ export type Order = {
   payment_method: 'Numerário' | 'Multibanco' | 'MB WAY' | null;
   recolha_data: string | null; // YYYY-MM-DD
   recolha_turno: 'manha' | 'tarde' | null;
+  lembrete_enviado: boolean;
   created_at: string;
   updated_at: string;
 };

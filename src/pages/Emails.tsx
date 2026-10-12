@@ -14,32 +14,52 @@ const VARS = ['nome', 'numero_encomenda', 'itens', 'total', 'data_limite', 'loca
 const TPL_META: Record<string, { icon: string; tint: string; col: string; para: string }> = {
   order_confirmation: { icon: 'check', tint: 'var(--green-soft)', col: 'var(--green)', para: 'Colaborador' },
   order_ready: { icon: 'box', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Colaborador' },
+  order_partial: { icon: 'box', tint: 'var(--amber-soft)', col: 'var(--amber)', para: 'Colaborador' },
+  order_delivered: { icon: 'check', tint: 'var(--green-soft)', col: 'var(--green)', para: 'Colaborador' },
   order_cancelled: { icon: 'x', tint: '#EEE', col: '#6B6B6B', para: 'Colaborador' },
   reserve_expiring: { icon: 'clock', tint: 'var(--amber-soft)', col: 'var(--amber)', para: 'Colaborador' },
   low_stock_alert: { icon: 'alert', tint: 'var(--red-soft)', col: 'var(--red)', para: 'Equipa interna' },
   admin_account_created: { icon: 'lock', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Administrador' },
   admin_password_reset: { icon: 'lock', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Administrador' },
+  product_availability_info: { icon: 'mail', tint: 'var(--blue-soft)', col: 'var(--navy)', para: 'Resposta manual' },
 };
 
 // Textos de origem das migrações (0001/0003) — usados pelo botão "Repor predefinição".
 const DEFAULTS: Record<string, { assunto: string; corpo: string }> = {
   order_confirmation: {
-    assunto: 'A tua encomenda {{numero_encomenda}} foi recebida',
+    assunto: 'Pedido em análise | {{numero_encomenda}} | ReCircula powered by Fidelidade',
     corpo:
-      'Olá {{nome}}, recebemos a tua encomenda {{numero_encomenda}}. {{itens}} Total: {{total}}. O pagamento é feito presencialmente no levantamento.',
+      'Olá, {{nome}},\n\nO seu pedido de manifestação de interesse com a referência {{numero_encomenda}} foi registado e está a ser analisado pela nossa equipa.\n\nReceberá um novo email com a confirmação dos artigos e horário de recolha num prazo máximo de 72h úteis.\n\nO presente email não confirma a atribuição dos artigos nem o agendamento de recolha. Não é necessário efetuar qualquer pagamento nesta fase.\n\nAgradecemos o seu interesse e a participação nesta iniciativa.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
   },
   order_ready: {
-    assunto: 'A tua encomenda {{numero_encomenda}} está pronta!',
+    assunto: 'O seu pedido está confirmado | {{numero_encomenda}} | ReCircula powered by Fidelidade',
     corpo:
-      'Olá {{nome}}, a tua encomenda {{numero_encomenda}} já está pronta. {{local_levantamento}} · {{horario}}. Total: {{total}}.',
+      'Olá, {{nome}},\n\nO seu pedido {{numero_encomenda}} está confirmado.\n\nArtigos:\n{{itens}}\n\nValor total de donativo: {{total}}\n\nInformações de recolha:\nData: {{data_limite}}\nHorário: {{horario}}\nLocal: {{local_levantamento}}\n\nA recolha apenas poderá ser realizada na data e no período horário acima indicados.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
+  },
+  order_partial: {
+    assunto: 'O seu pedido foi parcialmente aceite | {{numero_encomenda}} | ReCircula powered by Fidelidade',
+    corpo:
+      'Olá, {{nome}},\n\nO seu pedido {{numero_encomenda}} foi parcialmente aceite.\n\nArtigos e quantidades confirmados:\n{{itens}}\n\nValor total de donativo: {{total}}\n\nInformações de recolha:\nData: {{data_limite}}\nHorário: {{horario}}\nLocal: {{local_levantamento}}\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
+  },
+  order_delivered: {
+    assunto: 'Recolha concluída | {{numero_encomenda}} | ReCircula powered by Fidelidade',
+    corpo:
+      'Olá, {{nome}},\n\nConfirmamos que os artigos do seu pedido {{numero_encomenda}} foram recolhidos.\n\nAgradecemos a sua participação na iniciativa ReCircula powered by Fidelidade.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
   },
   order_cancelled: {
-    assunto: 'A tua encomenda {{numero_encomenda}} foi cancelada',
-    corpo: 'Olá {{nome}}, a tua encomenda {{numero_encomenda}} foi cancelada.',
+    assunto: 'Pedido cancelado por falta de recolha | {{numero_encomenda}} | ReCircula powered by Fidelidade',
+    corpo:
+      'Olá, {{nome}},\n\nNão registámos a recolha do seu pedido {{numero_encomenda}}, agendada para {{data_limite}}, no horário {{horario}}.\n\nO seu pedido foi cancelado. Não é devido qualquer donativo ou pagamento relativo a este pedido.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
   },
   reserve_expiring: {
-    assunto: 'Lembrete: levanta a encomenda {{numero_encomenda}} até {{data_limite}}',
-    corpo: 'Olá {{nome}}, a tua reserva termina a {{data_limite}}. {{local_levantamento}} · {{horario}}.',
+    assunto: 'O levantamento do seu pedido é amanhã | {{numero_encomenda}} | ReCircula powered by Fidelidade',
+    corpo:
+      'Olá, {{nome}},\n\nRecordamos que a recolha do seu pedido {{numero_encomenda}} está agendada para amanhã.\n\nInformações de recolha:\nData: {{data_limite}}\nHorário: {{horario}}\nLocal: {{local_levantamento}}\n\nO não comparecimento implica o cancelamento da reserva dos artigos.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
+  },
+  product_availability_info: {
+    assunto: 'Disponibilidade de artigos | ReCircula powered by Fidelidade',
+    corpo:
+      'Olá,\n\nObrigado pelo seu contacto e pelo interesse na iniciativa ReCircula powered by Fidelidade.\n\nNem todos os artigos dos antigos escritórios da Fidelidade foram integrados nesta iniciativa, como é o caso do artigo que refere.\n\nConsulte os artigos disponíveis na Loja Online.\n\nCom os melhores cumprimentos,\nENTRAJUDA | Banco de Bens Doados\nReCircula powered by Fidelidade',
   },
   low_stock_alert: {
     assunto: 'Stock baixo: {{produto}}',
@@ -53,8 +73,8 @@ const SAMPLE_VALS: Record<string, string> = {
   itens: '• 1× Cadeira de escritório — 40,00 €',
   total: '40,00 €',
   data_limite: new Date(Date.now() + 7 * 86400000).toLocaleDateString('pt-PT'),
-  local_levantamento: 'TODO(Rodrigo): confirmar local',
-  horario: 'TODO(Rodrigo): confirmar horário',
+  local_levantamento: 'R. José da Felicidade Alves 10, Lisboa',
+  horario: 'Dia todo',
   produto: 'Monitor 24"',
   stock: '2',
 };
