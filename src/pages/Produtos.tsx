@@ -132,6 +132,7 @@ export function Produtos() {
   });
 
   const categoryNome = (id: string | null) => categories.find((c) => c.id === id)?.nome ?? '—';
+  const tagNome = (id: string | null) => tags.find((t) => t.id === id)?.nome ?? null;
   const categoryLimite = (id: string | null) => categories.find((c) => c.id === id)?.limite_unidades ?? null;
   const tagsOf = (categoryId: string) => tags.filter((t) => t.category_id === categoryId);
   const imagensOf = (id?: string) => products.find((p) => p.id === id)?.imagens ?? [];
@@ -658,6 +659,7 @@ export function Produtos() {
                     </td>
                     <td>
                       {categoryNome(p.category_id)}
+                      {tagNome(p.tag_id) && <small style={{ display: 'block' }}>{tagNome(p.tag_id)}</small>}
                       {limite ? (
                         <>
                           {' '}
