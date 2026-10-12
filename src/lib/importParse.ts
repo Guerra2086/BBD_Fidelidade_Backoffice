@@ -6,6 +6,7 @@ export type ImportRow = {
   codigoCategoria: string | null;
   nome: string;
   categoria: string | null;
+  subcategoria: string | null;
   medidas: string | null;
   formato: string | null;
   grade: string | null;
@@ -24,6 +25,7 @@ const RAW_KEYS = [
   'CODIGO_CATEGORIA',
   'DESIGNACAO',
   'CATEGORIA',
+  'SUBCATEGORIA',
   'MEDIDAS',
   'FORMATO',
   'GRADE',
@@ -75,6 +77,7 @@ function normalizeRow(r: RawRecord): ImportRow | null {
     codigoCategoria: toStr(r.CODIGO_CATEGORIA) || null,
     nome: toStr(r.DESIGNACAO) || external_id,
     categoria: toStr(r.CATEGORIA) || null,
+    subcategoria: toStr(r.SUBCATEGORIA) || null,
     medidas: toStr(r.MEDIDAS) || null,
     formato: toStr(r.FORMATO) || null,
     grade: toStr(r.GRADE) || null,

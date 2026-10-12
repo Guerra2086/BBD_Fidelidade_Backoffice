@@ -8,11 +8,12 @@ import { useToast } from '../context/ToastContext';
 import { downloadCsv } from '../lib/csv';
 import { slugify } from '../lib/text';
 import { getOrCreateCategory } from '../lib/categories';
+import { getOrCreateTag } from '../lib/tags';
 import { readDroppedItems, readFileList, type DroppedFolder } from '../lib/folderDrop';
 import { parseProdutosCsv, parseProdutosJson, estadoFromGrade, reviewStatusFor, type ImportRow } from '../lib/importParse';
 import { processOneInWorker, terminateImageWorker } from '../lib/imageQueue';
 import { uploadProcessedImage, deleteProductImageFiles, safeSourceName } from '../lib/storageUpload';
-import type { Category, Product, QualityFlags } from '../types';
+import type { Category, Product, QualityFlags, Tag } from '../types';
 
 const PREVIEW_PAGE_SIZE = 10;
 
@@ -34,6 +35,7 @@ type Preview = {
 
 type ImportReport = {
   categoriasCriadas: number;
+  etiquetasCriadas: number;
   produtosCriados: number;
   produtosAtualizados: number;
   produtosSaltados: number;
@@ -132,6 +134,15 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     },
   });
 
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tags').select('*').order('ordem');
+      if (error) throw error;
+      return data as Tag[];
+    },
+  });
+
   const preview = useMemo(() => (folder && rows.length ? buildPreview(rows, folder, categories, products) : null), [folder, rows, categories, products]);
   const previewPaged = preview ? paginate(preview.produtos, previewPage, PREVIEW_PAGE_SIZE) : null;
 
@@ -175,6 +186,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
     setPhase('importing');
     const report: ImportReport = {
       categoriasCriadas: 0,
+      etiquetasCriadas: 0,
       produtosCriados: 0,
       produtosAtualizados: 0,
       produtosSaltados: 0,
@@ -184,7 +196,9 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
       erros: [],
     };
     const categoryCache = new Map<string, Category>();
+    const tagCache = new Map<string, Tag>();
     const categoriasAntes = new Set(categories.map((c) => c.slug));
+    const etiquetasAntes = new Set(tags.map((t) => `${t.category_id}:${t.slug}`));
     const existingByExternalId = new Map(products.filter((p) => p.external_id).map((p) => [p.external_id as string, p]));
 
     const totalFotos = preview.produtos.reduce((s, p) => s + p.fotosFound.length, 0);
@@ -200,11 +214,23 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           report.categoriasCriadas++;
         }
 
+        let tagId: string | null = null;
+        if (p.row.subcategoria) {
+          const etiqueta = await getOrCreateTag(supabase, categoria.id, p.row.subcategoria, tagCache);
+          tagId = etiqueta.id;
+          const etiquetaKey = `${etiqueta.category_id}:${etiqueta.slug}`;
+          if (!etiquetasAntes.has(etiquetaKey)) {
+            etiquetasAntes.add(etiquetaKey);
+            report.etiquetasCriadas++;
+          }
+        }
+
         const ativo = p.reviewStatus === null;
         const existing = existingByExternalId.get(p.row.external_id);
         const payload = {
           nome: p.row.nome,
           category_id: categoria.id,
+          tag_id: tagId,
           preco: p.row.preco,
           limite_compra: p.row.limiteCompra,
           estado: estadoFromGrade(p.row.grade),
@@ -440,6 +466,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           <h3>Relatório da importação</h3>
           <ul>
             <li>{report.categoriasCriadas} categorias criadas</li>
+            <li>{report.etiquetasCriadas} subcategorias (etiquetas) criadas</li>
             <li>{report.produtosCriados} produtos criados</li>
             <li>{report.produtosAtualizados} produtos atualizados</li>
             <li>{report.produtosSaltados} produtos saltados (fotos já importadas antes)</li>
@@ -479,8 +506,16 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
               onClick={() =>
                 report &&
                 downloadCsv('importacao.csv', [
-                  ['Categorias criadas', 'Produtos criados', 'Produtos atualizados', 'Fotos enviadas', 'Fotos com avisos', 'Erros'],
-                  [report.categoriasCriadas, report.produtosCriados, report.produtosAtualizados, report.fotosEnviadas, report.fotosComAvisos, report.erros.length],
+                  ['Categorias criadas', 'Etiquetas criadas', 'Produtos criados', 'Produtos atualizados', 'Fotos enviadas', 'Fotos com avisos', 'Erros'],
+                  [
+                    report.categoriasCriadas,
+                    report.etiquetasCriadas,
+                    report.produtosCriados,
+                    report.produtosAtualizados,
+                    report.fotosEnviadas,
+                    report.fotosComAvisos,
+                    report.erros.length,
+                  ],
                 ])
               }
             >
