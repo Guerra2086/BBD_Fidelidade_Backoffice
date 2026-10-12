@@ -52,6 +52,7 @@ type FormState = {
   tag_id: string;
   descricao: string;
   medidas: string;
+  limite_compra: string;
   preco: string;
   estado: (typeof ESTADOS)[number];
   icone: string;
@@ -67,6 +68,7 @@ const EMPTY_FORM: FormState = {
   tag_id: '',
   descricao: '',
   medidas: '',
+  limite_compra: '',
   preco: '',
   estado: 'Novo',
   icone: ICON_KEYS[0],
@@ -143,6 +145,7 @@ export function Produtos() {
         tag_id: p.tag_id ?? '',
         descricao: p.descricao ?? '',
         medidas: p.medidas ?? '',
+        limite_compra: p.limite_compra === null ? '' : String(p.limite_compra),
         preco: p.preco === null ? '' : String(p.preco),
         estado: p.estado,
         icone: p.icone,
@@ -237,6 +240,7 @@ export function Produtos() {
         tag_id: form.tag_id || null,
         descricao: form.descricao || null,
         medidas: form.medidas || null,
+        limite_compra: form.limite_compra === '' ? null : Number(form.limite_compra),
         preco: form.preco === '' ? null : Number(form.preco),
         estado: form.estado,
         icone: form.icone,
@@ -871,6 +875,19 @@ export function Produtos() {
                 placeholder="ex.: 75 × 120 × 60 cm"
                 value={editing.medidas}
                 onChange={(e) => setEditing({ ...editing, medidas: e.target.value })}
+              />
+            </div>
+            <div className="f">
+              <label>
+                Limite de compra por colaborador <small>(unidades deste artigo, opcional — vazio = sem limite)</small>
+              </label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                placeholder="ex.: 4"
+                value={editing.limite_compra}
+                onChange={(e) => setEditing({ ...editing, limite_compra: e.target.value })}
               />
             </div>
             <div className="cols">

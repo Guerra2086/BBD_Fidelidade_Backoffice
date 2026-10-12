@@ -33,6 +33,7 @@ export type Product = {
   codigo_passaporte: string;
   external_id: string | null;
   medidas: string | null;
+  limite_compra: number | null;
   formato: string | null;
   edificios: string | null;
   grade: string | null;

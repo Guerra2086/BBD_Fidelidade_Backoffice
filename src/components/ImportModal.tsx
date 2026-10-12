@@ -206,6 +206,7 @@ export function ImportModal({ onClose }: { onClose: () => void }) {
           nome: p.row.nome,
           category_id: categoria.id,
           preco: p.row.preco,
+          limite_compra: p.row.limiteCompra,
           estado: estadoFromGrade(p.row.grade),
           medidas: p.row.medidas,
           formato: p.row.formato,

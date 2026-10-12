@@ -11,6 +11,7 @@ export type ImportRow = {
   edificios: string | null;
   stock: number;
   preco: number | null;
+  limiteCompra: number | null;
   destinos: string[];
   fotos: string[];
   estadoOrigem: string | null;
@@ -27,6 +28,7 @@ const RAW_KEYS = [
   'EDIFICIOS',
   'QTD_TOTAL',
   'VALOR_SUGERIDO',
+  'QTD_MAXIMA_VENDA',
   'DESTINOS',
   'FOTOS',
   'ESTADO',
@@ -76,6 +78,7 @@ function normalizeRow(r: RawRecord): ImportRow | null {
     edificios: toStr(r.EDIFICIOS) || null,
     stock: Math.max(0, Math.round(toNumberOrNull(r.QTD_TOTAL) ?? 0)),
     preco: toNumberOrNull(r.VALOR_SUGERIDO),
+    limiteCompra: toNumberOrNull(r.QTD_MAXIMA_VENDA),
     destinos: toList(r.DESTINOS, '/').map((s) => s.toUpperCase()),
     fotos: toList(r.FOTOS, ';'),
     estadoOrigem,
